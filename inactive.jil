@@ -1,0 +1,65 @@
+/* =============================================================================
+ * AutoSys Job Inactivation - Parallel Execution (TXT File Based)
+ * =============================================================================
+ * This JIL defines the AutoSys job that triggers the inactive.sh script
+ * to set all jobs to INACTIVE status.
+ *
+ * PREREQUISITE: Run generate_inactive_jobs.py in Databricks first to create
+ *               the inactive_jobs.txt file.
+ *
+ * The script runs with 20 parallel threads and retries failed jobs 3 times.
+ * ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+ * PRODUCTION Environment
+ * ----------------------------------------------------------------------------- */
+insert_job: WMA_ESL_5481_PRD_DMSH_PRCSSNG_INACTIVE
+job_type: CMD
+command: bash -c 'source /mnt/ingestion/autosys/esl.env; /mnt/ingestion/autosys/inactive.sh --file /dbfs/mnt/dataops/config/inactive_jobs.txt --threads 20 --retries 3'
+machine: autosys01.eislprod.azpriv-cloud.ubs.net,autosys02.eislprod.azpriv-cloud.ubs.net
+owner: svc_alp_eslapp
+permission: ge,gx,wx
+date_conditions: 0
+description: "AutoSys Job Inactivation - TXT File Based Parallel (PRD)"
+max_run_alarm: 60
+alarm_if_fail: 1
+profile: '/mnt/ingestion/autosys/esl.env'
+alarm_if_terminated: 1
+group: NDP01
+application: 5481_APP_AT35700
+
+/* -----------------------------------------------------------------------------
+ * QA Environment
+ * ----------------------------------------------------------------------------- */
+insert_job: WMA_ESL_5481_QA_DMSH_PRCSSNG_INACTIVE
+job_type: CMD
+command: bash -c 'source /mnt/ingestion/autosys/esl.env; /mnt/ingestion/autosys/inactive.sh --file /dbfs/mnt/dataops/config/inactive_jobs.txt --threads 20 --retries 3'
+machine: autosys01.eisltest.azpriv-cloud.ubs.net,autosys02.eisltest.azpriv-cloud.ubs.net
+owner: svc_alp_eslapp
+permission: ge,gx,wx
+date_conditions: 0
+description: "AutoSys Job Inactivation - TXT File Based Parallel (QA)"
+max_run_alarm: 60
+alarm_if_fail: 1
+profile: '/mnt/ingestion/autosys/esl.env'
+alarm_if_terminated: 1
+group: NDP01
+application: 5481_APP_AT35700
+
+/* -----------------------------------------------------------------------------
+ * DEV Environment
+ * ----------------------------------------------------------------------------- */
+insert_job: WMA_ESL_5481_DEV_DMSH_PRCSSNG_INACTIVE
+job_type: CMD
+command: bash -c 'source /mnt/ingestion/autosys/esl.env; /mnt/ingestion/autosys/inactive.sh --file /dbfs/mnt/dataops/config/inactive_jobs.txt --threads 20 --retries 3'
+machine: autosys01.eisldev.azpriv-cloud.ubs.net
+owner: svc_alp_eslapp
+permission: ge,gx,wx
+date_conditions: 0
+description: "AutoSys Job Inactivation - TXT File Based Parallel (DEV)"
+max_run_alarm: 60
+alarm_if_fail: 1
+profile: '/mnt/ingestion/autosys/esl.env'
+alarm_if_terminated: 1
+group: NDP01
+application: 5481_APP_AT35700
