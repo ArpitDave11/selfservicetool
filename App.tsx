@@ -3166,9 +3166,11 @@ export default function App() {
                         <div
                           key={item.path}
                           onClick={() => {
+                            console.log('[DEBUG] Clicked item:', item.name, item.type, item.path);
                             if (item.type === 'tree') {
                               handleBrowseFiles(item.path);
                             } else {
+                              console.log('[DEBUG] Calling handleLoadFile for:', item.path);
                               handleLoadFile(item.path);
                             }
                           }}
