@@ -714,7 +714,8 @@ export default function App() {
 
   const currentStage = STAGES[state.currentStage];
   const isLastStage = state.currentStage === STAGES.length - 1;
-  const hasEpic = state.generatedEpic !== null;
+  // Show Epic Editor tab if we have a generated epic OR loaded content from GitLab
+  const hasEpic = state.generatedEpic !== null || editableEpic.trim().length > 0;
 
   // Build context from all data
   const getContext = useCallback(() => {
