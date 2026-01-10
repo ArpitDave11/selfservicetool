@@ -1964,9 +1964,10 @@ export default function App() {
       setLoadingRepoFiles(false);
 
       if (result.success && result.content) {
-        // Load content into editor
+        // Load content into editor and switch to Epic Editor tab
         setEditableEpic(result.content);
-        showToast('success', 'File Loaded', `Loaded: ${result.fileName}`);
+        setActiveTab('epic');  // Auto-switch to Epic Editor for live editing
+        showToast('success', 'File Loaded', `Loaded: ${result.fileName} - Now editing`);
         console.log('[File Browser] File loaded:', result.fileName, result.size, 'bytes');
       } else {
         showToast('error', 'Load Failed', result.error || 'Could not load file');
@@ -2850,30 +2851,17 @@ export default function App() {
             </div>
 
             <div style={{ opacity: gitlabEnabled ? 1 : 0.5, transition: 'opacity 0.2s ease' }}>
-              {/* URL & Project in 2 columns */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div style={styles.fieldGroup}>
-                  <label style={{ ...styles.label, fontSize: '12px' }}>GitLab URL</label>
-                  <input
-                    type="text"
-                    style={{ ...styles.input, fontSize: '13px', padding: '8px 10px' }}
-                    placeholder="https://gitlab.com"
-                    value={config.gitlab.baseUrl}
-                    onChange={(e) => updateConfig({ ...config, gitlab: { ...config.gitlab, baseUrl: e.target.value } })}
-                    disabled={!gitlabEnabled}
-                  />
-                </div>
-                <div style={styles.fieldGroup}>
-                  <label style={{ ...styles.label, fontSize: '12px' }}>Project ID/Path</label>
-                  <input
-                    type="text"
-                    style={{ ...styles.input, fontSize: '13px', padding: '8px 10px' }}
-                    placeholder="group/project"
-                    value={config.gitlab.projectId}
-                    onChange={(e) => updateConfig({ ...config, gitlab: { ...config.gitlab, projectId: e.target.value } })}
-                    disabled={!gitlabEnabled}
-                  />
-                </div>
+              {/* GitLab URL */}
+              <div style={{ ...styles.fieldGroup, marginBottom: '12px' }}>
+                <label style={{ ...styles.label, fontSize: '12px' }}>GitLab URL</label>
+                <input
+                  type="text"
+                  style={{ ...styles.input, fontSize: '13px', padding: '8px 10px' }}
+                  placeholder="https://gitlab.com"
+                  value={config.gitlab.baseUrl}
+                  onChange={(e) => updateConfig({ ...config, gitlab: { ...config.gitlab, baseUrl: e.target.value } })}
+                  disabled={!gitlabEnabled}
+                />
               </div>
 
               {/* Access Token - full width */}
@@ -3111,8 +3099,9 @@ export default function App() {
                   fontSize: '12px',
                   color: '#92400e'
                 }}>
-                  <strong>Next Step:</strong> Select a Pod, then navigate through subgroups (📁) until you find a project (📄) to select.
-                  Once a project is selected, you'll see the <strong>Repository Browser</strong> and <strong>Publish Mode</strong> options.
+                  <strong>Next Step:</strong> Click <strong>Load Projects</strong> to list all projects in the group, then select one from the dropdown.
+                  Or use <strong>Browse Subgroups</strong> to navigate through subgroups (📁) until you find a project (📄).
+                  Once selected, you can Test Connection and access the <strong>Repository Browser</strong>.
                 </div>
               )}
 
