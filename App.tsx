@@ -454,7 +454,7 @@ export default function App() {
   const [alternatives, setAlternatives] = useState<Record<string, string[]>>({});
   const [isRefining, setIsRefining] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'wizard' | 'epic' | 'blueprint' | 'settings'>('wizard');
+  const [activeTab, setActiveTab] = useState<'wizard' | 'epic' | 'blueprint' | 'settings' | 'liveeditor'>('wizard');
   const [editableEpic, setEditableEpic] = useState<string>('');
   const [blueprintCode, setBlueprintCode] = useState<string>('');
   const [blueprintType, setBlueprintType] = useState<string>('');
@@ -481,6 +481,12 @@ export default function App() {
   // Direct project selection from group
   const [groupProjects, setGroupProjects] = useState<Array<{ id: number; name: string; path: string }>>([]);
   const [loadingGroupProjects, setLoadingGroupProjects] = useState(false);
+
+  // Live Editor state (separate from Epic Editor - for GitLab file editing)
+  const [liveEditorContent, setLiveEditorContent] = useState('');
+  const [liveEditorFile, setLiveEditorFile] = useState<{ path: string; name: string } | null>(null);
+  const [liveEditorCommitMessage, setLiveEditorCommitMessage] = useState('');
+  const [isCommitting, setIsCommitting] = useState(false);
 
   // Phase 8-10: New GitLab states
   const [branches, setBranches] = useState<GitLabBranch[]>([]);
@@ -714,8 +720,7 @@ export default function App() {
 
   const currentStage = STAGES[state.currentStage];
   const isLastStage = state.currentStage === STAGES.length - 1;
-  // Show Epic Editor tab if we have a generated epic OR loaded content from GitLab
-  const hasEpic = state.generatedEpic !== null || editableEpic.trim().length > 0;
+  const hasEpic = state.generatedEpic !== null;
 
   // Build context from all data
   const getContext = useCallback(() => {
@@ -1384,6 +1389,156 @@ export default function App() {
     }
   };
 
+  // Live Editor handlers for GitLab file editing
+  const handleDirectCommit = async () => {
+    if (!liveEditorFile || !liveEditorCommitMessage.trim()) {
+      showToast('warning', 'Missing Info', 'Please enter a commit message');
+      return;
+    }
+    if (!config.gitlab.projectId || !config.gitlab.accessToken) {
+      showToast('error', 'GitLab Not Configured', 'Please configure GitLab settings first');
+      return;
+    }
+    setIsCommitting(true);
+    // TODO: Implement GitLab API call to commit file
+    // POST /projects/:id/repository/files/:path with action: "update"
+    showToast('info', 'Coming Soon', 'Direct commit functionality will be implemented');
+    setIsCommitting(false);
+  };
+
+  const handleCreateMergeRequest = async () => {
+    if (!liveEditorFile) return;
+    if (!config.gitlab.projectId || !config.gitlab.accessToken) {
+      showToast('error', 'GitLab Not Configured', 'Please configure GitLab settings first');
+      return;
+    }
+    setIsCommitting(true);
+    // TODO: Implement GitLab API calls to:
+    // 1. Create new branch
+    // 2. Commit file to new branch
+    // 3. Create MR from new branch to default branch
+    showToast('info', 'Coming Soon', 'Merge request functionality will be implemented');
+    setIsCommitting(false);
+  };
+
+  const handleCloseLiveEditor = () => {
+    setLiveEditorFile(null);
+    setLiveEditorContent('');
+    setLiveEditorCommitMessage('');
+    setActiveTab('settings');
+  };
+
+  // Render Live Editor view (separate from Epic Editor)
+  const renderLiveEditor = () => {
+    if (!liveEditorFile) return null;
+
+    return (
+      <div style={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: '#1f2937' }}>Live Editor</h2>
+            <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              📄 {liveEditorFile.path}
+            </div>
+          </div>
+          <button
+            onClick={handleCloseLiveEditor}
+            style={{
+              padding: '6px 12px',
+              fontSize: '13px',
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              cursor: 'pointer',
+            }}
+          >
+            ✕ Close
+          </button>
+        </div>
+
+        {/* Editor */}
+        <textarea
+          value={liveEditorContent}
+          onChange={(e) => setLiveEditorContent(e.target.value)}
+          style={{
+            flex: 1,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontSize: '13px',
+            lineHeight: '1.5',
+            padding: '16px',
+            border: '1px solid #d1d5db',
+            borderRadius: '8px',
+            resize: 'none',
+            backgroundColor: '#fafafa',
+            marginBottom: '16px',
+          }}
+          placeholder="File content..."
+        />
+
+        {/* Commit Message */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+            Commit Message
+          </label>
+          <input
+            type="text"
+            placeholder="Describe your changes..."
+            value={liveEditorCommitMessage}
+            onChange={(e) => setLiveEditorCommitMessage(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              fontSize: '14px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            onClick={handleDirectCommit}
+            disabled={isCommitting}
+            style={{
+              flex: 1,
+              padding: '12px 20px',
+              fontSize: '14px',
+              fontWeight: 600,
+              backgroundColor: isCommitting ? '#94a3b8' : '#fc6d26',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: isCommitting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isCommitting ? 'Processing...' : 'Direct Commit'}
+          </button>
+          <button
+            onClick={handleCreateMergeRequest}
+            disabled={isCommitting}
+            style={{
+              flex: 1,
+              padding: '12px 20px',
+              fontSize: '14px',
+              fontWeight: 600,
+              backgroundColor: isCommitting ? '#94a3b8' : '#1f883d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: isCommitting ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isCommitting ? 'Processing...' : 'Create Merge Request'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // Render Mermaid Blueprint view
   const renderBlueprint = () => (
     <div>
@@ -1965,11 +2120,13 @@ export default function App() {
       setLoadingRepoFiles(false);
 
       if (result.success && result.content) {
-        // Load content into editor and switch to Epic Editor tab
-        setEditableEpic(result.content);
-        setActiveTab('epic');  // Auto-switch to Epic Editor for live editing
-        showToast('success', 'File Loaded', `Loaded: ${result.fileName} - Now editing`);
-        console.log('[File Browser] File loaded:', result.fileName, result.size, 'bytes');
+        // Load into Live Editor (SEPARATE from Epic Editor)
+        const fileName = result.fileName || filePath.split('/').pop() || '';
+        setLiveEditorContent(result.content);
+        setLiveEditorFile({ path: filePath, name: fileName });
+        setLiveEditorCommitMessage(`Update ${fileName}`);
+        setActiveTab('liveeditor');  // Switch to Live Editor tab
+        showToast('success', 'File Loaded', `Loaded: ${fileName}`);
       } else {
         showToast('error', 'Load Failed', result.error || 'Could not load file');
       }
@@ -3895,6 +4052,14 @@ export default function App() {
               </button>
             </>
           )}
+          {liveEditorFile && (
+            <button style={styles.tab(activeTab === 'liveeditor')} onClick={() => setActiveTab('liveeditor')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={styles.tabIcon}>
+                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 2l5 5h-5V4zM6 20V4h6v6h6v10H6z"/>
+              </svg>
+              Live Editor
+            </button>
+          )}
         </div>
         <button
           style={{
@@ -3948,6 +4113,8 @@ export default function App() {
             </div>
           </div>
         </div>
+      ) : activeTab === 'liveeditor' ? (
+        renderLiveEditor()
       ) : activeTab === 'wizard' ? (
         renderWizard()
       ) : activeTab === 'blueprint' ? (
