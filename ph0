@@ -1,0 +1,621 @@
+phases - 0
+# **PHASE 0: SPOON-FED GUIDE**  
+*For Absolute Beginners - Every Command, Every Click, Every Word to Type*
+
+---
+
+## **BEFORE YOU START: PREREQUISITES CHECKLIST**
+
+### **Step 0.1: Install Required Software**
+
+1. **Node.js & npm** (if you don't have them)
+   - Go to https://nodejs.org/
+   - Click the green "LTS" button (big one on the left)
+   - Download and run the installer (click "Next" on everything)
+   - Restart your computer after installing
+   - **Verify**: Open terminal/command prompt and type:
+     ```bash
+     node --version
+     ```
+     Should show something like `v20.x.x`. If you see "command not found", install didn't work.
+
+2. **Git** (for version control)
+   - Go to https://git-scm.com/downloads
+   - Download for your operating system
+   - Install with all default options
+   - **Verify**: In terminal, type:
+     ```bash
+     git --version
+     ```
+     Should show a version number.
+
+3. **Claude Code** (the AI assistant)
+   - In terminal, type this EXACT command:
+     ```bash
+     npm install -g @anthropic-ai/claude-code
+     ```
+   - Wait for it to finish (might take 1-2 minutes)
+   - **Verify**: Type:
+     ```bash
+     claude --version
+     ```
+     Should show a version number.
+
+4. **Code Editor** (if you don't have one)
+   - Download VS Code: https://code.visualstudio.com/
+   - Install it
+
+---
+
+### **Step 0.2: Set Up Your Project Directory**
+
+1. Open terminal/command prompt
+2. Navigate to where you keep projects. Type:
+   ```bash
+   cd ~/Documents  # or wherever you want the project
+   ```
+
+3. Create a new folder and go into it:
+   ```bash
+   mkdir epic-generator-v2
+   cd epic-generator-v2
+   ```
+
+4. Copy your existing code into this folder:
+   - If you have the files, just drag them into this folder
+   - If you're starting fresh, create the basic structure:
+     ```bash
+     mkdir src
+     touch src/App.tsx src/config.ts src/skills.ts src/types.ts src/main.tsx
+     ```
+
+5. **Initialize git** (VERY IMPORTANT for tracking changes):
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial code before template engine refactor"
+   ```
+
+---
+
+### **Step 0.3: Create Claude Configuration**
+
+1. In your project root (the `epic-generator-v2` folder), create a file:
+   ```bash
+   touch .claude-context.md
+   ```
+
+2. Open this file in VS Code:
+   ```bash
+   code .claude-context.md
+   ```
+
+3. **Copy and paste EXACTLY this content** into the file:
+
+```markdown
+# EPIC GENERATOR V2 - Claude Context
+This is a React + TypeScript project that generates technical documentation.
+We're refactoring it from a hardcoded "6 stages → 17 sections" epic generator
+into a DYNAMIC TEMPLATE ENGINE where templates are first-class citizens.
+
+## CURRENT ARCHITECTURE
+- Frontend: React 18, TypeScript, Vite
+- AI: Azure OpenAI (GPT-4/GPT-5)
+- Diagrams: Mermaid.js
+- Storage: localStorage
+- Publishing: GitLab API
+
+## KEY FILES
+- `src/config.ts`: Azure + GitLab configuration
+- `src/skills.ts`: AI prompts, refinement logic, diagram generation
+- `src/types.ts`: STAGES array (6 stages), EPIC_SECTIONS array (17 sections) ← THESE ARE BEING REMOVED
+- `src/App.tsx`: Main wizard UI, hardcoded to current stages
+
+## REFACTOR GOAL
+Replace STAGES and EPIC_SECTIONS with a TemplateDefinition system.
+The CURRENT epic generator becomes ONE template: "Technical Epic Generator"
+
+## TEMPLATE SCHEMA (DRAFT)
+- Template has: id, name, stages[], outputSections[]
+- Stage has: id, title, fields[], populatesSections[]
+- Field has: name, type, required, promptConfig
+- OutputSection has: id, title, dataKeys[], renderer
+
+## RULES FOR CLAUDE
+- ALWAYS export functions and types
+- NEVER hardcode "6 stages" or "17 sections"
+- Use generic names like "TemplateEngine" not "EpicEngine"
+- Keep backward compatibility in mind
+- Write tests for every new service
+- Use TypeScript strict mode
+- Follow existing code style (semicolons, quotes, etc.)
+```
+
+4. **Save the file** (Ctrl+S or Cmd+S)
+
+---
+
+## **TASK 1: CODEBASE DOCUMENTATION** (30 minutes)
+
+### **What this means:**
+Before we change anything, we'll have Claude analyze your code and create a map showing exactly where the "6 stages" and "17 sections" are hardcoded. This is like taking a photo before renovating a house.
+
+### **Step 1.1: Run Claude Analysis**
+
+1. In terminal, make sure you're in your project root:
+   ```bash
+   pwd  # Should show your project folder path
+   ```
+
+2. **Copy and paste this ENTIRE command** into your terminal:
+
+```bash
+claude "I need a complete audit of hardcoded dependencies on the STAGES and EPIC_SECTIONS constants. Please analyze all files in the src/ directory and identify:
+
+1. Every file that imports or uses STAGES
+2. Every file that imports or uses EPIC_SECTIONS  
+3. Every function that assumes 6 stages (e.g., STAGES.length === 6)
+4. Every function that assumes 17 sections (e.g., EPIC_SECTIONS.length)
+5. Every hardcoded reference to stage numbers (e.g., 'Stage 5', 'Section 12')
+6. Every prompt or string that mentions '17 sections' or '6 stages'
+
+For each finding, provide:
+- File name
+- Line number
+- Code snippet
+- Suggested abstraction (how to make it generic)
+
+Format as a markdown table. Be exhaustive - we're doing a major refactor and need to know every single hardcoded reference."
+```
+
+3. Press Enter and wait (this takes 1-2 minutes)
+
+4. **What you'll see**: Claude will output a markdown table. **Copy this ENTIRE output** and save it:
+
+```bash
+# Create audit file
+touch CODEBASE-AUDIT.md
+
+# Open it
+code CODEBASE-AUDIT.md
+```
+
+5. Paste Claude's output into this file and save it.
+
+### **Step 1.2: Create Architecture Diagram**
+
+1. Ask Claude to visualize the relationships:
+
+```bash
+claude "Based on the codebase audit, create a Mermaid diagram showing:
+
+1. All files as nodes
+2. Dependencies between files (arrows)
+3. Highlight in red any file that depends on STAGES or EPIC_SECTIONS
+4. Highlight in blue the core services that should become generic
+5. Show the data flow from user input → stages → refinement → sections → output
+
+Use this format:
+```mermaid
+graph TD
+    App.tsx --> Wizard
+    Wizard --> STAGES[STAGES<br/><span style='color:red'>Hardcoded</span>]
+    Skills.ts --> EPIC_SECTIONS[EPIC_SECTIONS<br/><span style='color:red'>Hardcoded</span>]
+    %% Add all other connections
+```
+
+Save the output to a file called `ARCHITECTURE-DIAGRAM.md`."
+```
+
+2. Copy the Mermaid diagram Claude generates into the new file:
+   ```bash
+   touch ARCHITECTURE-DIAGRAM.md
+   code ARCHITECTURE-DIAGRAM.md
+   ```
+
+3. Paste the diagram and save.
+
+### **Step 1.3: Verify**
+You should now have two files:
+- `CODEBASE-AUDIT.md` - Table of all hardcoded references
+- `ARCHITECTURE-DIAGRAM.md` - Visual map
+
+Check that they exist:
+```bash
+ls -la *.md
+```
+
+---
+
+## **TASK 2: CREATE TEST HARNESS** (45 minutes)
+
+### **What this means:**
+We'll create automated tests that capture the CURRENT behavior of your app. These tests will tell us if the refactor breaks anything. Think of them as guardrails.
+
+### **Step 2.1: Install Testing Tools**
+
+1. In terminal, run this EXACT command:
+   ```bash
+   npm install -D vitest @testing-library/react @testing-library/user-event jsdom
+   ```
+
+2. Wait for installation to complete (2-3 minutes)
+
+3. Open `package.json` in VS Code:
+   ```bash
+   code package.json
+   ```
+
+4. Add this to the JSON (inside the main object, after "scripts"):
+   ```json
+   "scripts": {
+     "dev": "vite",
+     "build": "tsc && vite build",
+     "preview": "vite preview",
+     "test": "vitest"
+   },
+   ```
+
+5. Create a test configuration file:
+   ```bash
+   touch vitest.config.ts
+   code vitest.config.ts
+   ```
+
+6. Paste this EXACT content:
+```typescript
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
+  },
+});
+```
+
+7. Create test setup file:
+   ```bash
+   mkdir -p src/test
+   touch src/test/setup.ts
+   code src/test/setup.ts
+   ```
+
+8. Paste this:
+```typescript
+import '@testing-library/jest-dom';
+```
+
+### **Step 2.2: Create Baseline Tests**
+
+1. Create test file for the core functionality:
+   ```bash
+   touch src/skills.test.ts
+   code src/skills.test.ts
+   ```
+
+2. **Copy and paste this ENTIRE content** (this captures current behavior):
+
+```typescript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { runSkill, getSuggestion } from './skills';
+import { DEFAULT_CONFIG } from './config';
+import { setConfig } from './skills';
+import { STAGES, EPIC_SECTIONS } from './types';
+
+// Mock the AI call
+vi.mock('./config', async () => {
+  const actual = await vi.importActual('./config');
+  return {
+    ...actual,
+    callAzureOpenAI: vi.fn(async (config, systemPrompt, userPrompt) => {
+      // Mock response that mimics current behavior
+      return "Mock AI response for: " + userPrompt.slice(0, 50);
+    })
+  };
+});
+
+// Test data matching current structure
+const mockContext = {
+  projectName: 'Test Project',
+  objective: 'Build a test system',
+  background: 'Testing background'
+};
+
+describe('Legacy Epic Generator - Baseline Tests', () => {
+  beforeEach(() => {
+    setConfig(DEFAULT_CONFIG);
+  });
+
+  it('should have exactly 6 stages', () => {
+    expect(STAGES.length).toBe(6);
+    expect(STAGES[0].id).toBe('project');
+    expect(STAGES[5].id).toBe('delivery');
+  });
+
+  it('should have exactly 17 epic sections', () => {
+    expect(EPIC_SECTIONS.length).toBe(17);
+    expect(EPIC_SECTIONS[0].num).toBe(1);
+    expect(EPIC_SECTIONS[16].num).toBe(17);
+  });
+
+  it('should refine a project name field', async () => {
+    const result = await runSkill('refine', {
+      stageId: 'project',
+      fieldName: 'projectName',
+      input: 'Test Project',
+      context: mockContext
+    });
+
+    expect(result.refined).toBeDefined();
+    expect(result.diagramNode).toBeDefined();
+  });
+
+  it('should generate a full epic with 17 sections', async () => {
+    const mockData = {
+      projectName: {
+        original: 'Test Project',
+        refined: '**Project:** Test Project',
+        diagramNode: 'Project["Test Project"]'
+      },
+      objective: {
+        original: 'Build something',
+        refined: '**Objective:** Build something',
+        diagramNode: 'Objective["Build something"]'
+      }
+    };
+
+    // This will fail initially due to incomplete data, but shows the expected structure
+    // In your actual test, you'd provide all required fields
+    const result = await runSkill('generate', {
+      data: mockData,
+      projectName: 'Test Project'
+    });
+
+    expect(result.epic).toBeDefined();
+    expect(result.diagram).toBeDefined();
+  });
+
+  it('should map fields to correct sections', () => {
+    // Check that project stage populates sections 1 and 2
+    expect(STAGES[0].populatesSections).toEqual([1, 2]);
+    
+    // Check that delivery stage populates sections 13, 15, 16, 17
+    expect(STAGES[5].populatesSections).toEqual([13, 15, 16, 17]);
+  });
+});
+```
+
+3. **Save the file** (Ctrl+S)
+
+### **Step 2.3: Run Tests and Create Snapshot**
+
+1. In terminal, run:
+   ```bash
+   npm test
+   ```
+
+2. **What you should see**: Tests will run and probably fail (that's OK!). The important thing is they capture the CURRENT behavior.
+
+3. Copy the test output and save it as a baseline:
+   ```bash
+   touch TEST-BASELINE.md
+   code TEST-BASELINE.md
+   ```
+
+4. Paste the terminal output (especially any errors or the test results summary).
+
+5. **Create a snapshot of current behavior**:
+   - In VS Code, open `src/App.tsx`
+   - Run the app: `npm run dev`
+   - In browser, go through the wizard once (fill in dummy data)
+   - Copy the final generated epic
+   - Paste it into a file:
+     ```bash
+     touch EXAMPLE-LEGACY-OUTPUT.md
+     code EXAMPLE-LEGACY-OUTPUT.md
+     ```
+
+6. **Verify**: You should have:
+   - `src/skills.test.ts` - Test file
+   - `TEST-BASELINE.md` - Test results
+   - `EXAMPLE-LEGACY-OUTPUT.md` - Sample output
+
+---
+
+## **TASK 3: TEMPLATE SCHEMA DESIGN** (30 minutes)
+
+### **What this means:**
+We'll design the JSON structure that will replace STAGES and EPIC_SECTIONS. This is like creating a blueprint for how all future templates will be built.
+
+### **Step 3.1: Create Schema Draft with Claude**
+
+1. In terminal, ask Claude to design the schema:
+```bash
+claude "Design a comprehensive TemplateDefinition JSON schema that can represent ANY template with:
+1. Variable number of stages (not just 6)
+2. Variable number of fields per stage
+3. Variable number of output sections (not just 17)
+4. Field types: text, textarea, select, multiselect, number, date
+5. AI prompt configuration per field
+6. Output section configuration (title, format: markdown/table/list)
+7. Section-to-field mapping (which fields populate which sections)
+8. Diagram hints per section
+9. Template metadata (name, version, author, description)
+
+Provide:
+- TypeScript interfaces for the schema
+- Zod validation schema
+- Example JSON for the current epic template (6 stages, 17 sections)
+- Example JSON for a simpler template (e.g., 3 stages, 5 sections)
+
+Make it EXTENSIBLE - think about future features we haven't considered yet.
+
+Format as a complete TypeScript file that I can save as `src/templates/schema.ts`."
+```
+
+2. Create the schema file:
+   ```bash
+   mkdir -p src/templates
+   touch src/templates/schema.ts
+   code src/templates/schema.ts
+   ```
+
+3. **Copy Claude's ENTIRE output** (should be a complete TypeScript file with interfaces and examples) and paste it into `schema.ts`
+
+4. Save the file.
+
+### **Step 3.2: Validate the Schema**
+
+1. Create a test file for the schema:
+   ```bash
+   touch src/templates/schema.test.ts
+   code src/templates/schema.test.ts
+   ```
+
+2. Paste this:
+```typescript
+import { describe, it, expect } from 'vitest';
+import { TemplateDefinition, EpicTemplateSchema } from './schema';
+
+describe('Template Schema', () => {
+  it('should validate the legacy epic template', () => {
+    const legacyTemplate: TemplateDefinition = {
+      // Paste the legacy template JSON from Claude here
+    };
+
+    const result = EpicTemplateSchema.safeParse(legacyTemplate);
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject invalid template (missing required fields)', () => {
+    const invalidTemplate = {
+      id: 'bad-template',
+      // Missing name, stages, etc.
+    };
+
+    const result = EpicTemplateSchema.safeParse(invalidTemplate);
+    expect(result.success).toBe(false);
+  });
+});
+```
+
+3. Run tests:
+   ```bash
+   npm test schema.test.ts
+   ```
+
+4. If tests fail, ask Claude to fix:
+```bash
+claude "The schema test is failing. Here's the error: [paste error]. Please fix the schema definition in src/templates/schema.ts"
+```
+
+### **Step 3.3: Create Legacy Template JSON**
+
+1. Create templates directory:
+   ```bash
+   mkdir -p public/templates
+   ```
+
+2. Create the legacy template file:
+   ```bash
+   touch public/templates/legacy-epic-template.json
+   code public/templates/legacy-epic-template.json
+   ```
+
+3. Ask Claude to generate the full template:
+```bash
+claude "Convert the current hardcoded STAGES and EPIC_SECTIONS from src/types.ts into a complete TemplateDefinition JSON file following the schema we just created. Save it as a file called 'legacy-epic-template.json' with:
+- id: 'legacy-epic-v1'
+- name: 'Technical Epic Generator'
+- description: 'Original 6-stage to 17-section epic generator'
+- All 6 stages with all their fields
+- All 17 output sections with proper field mapping
+- AI prompts for each field (extract from skills.ts)
+- Version: '1.0.0'
+
+Output as a complete JSON file I can copy-paste."
+```
+
+4. Copy Claude's JSON output and paste it into the file.
+
+5. **Verify**: The JSON should be valid. Check with:
+   ```bash
+   node -e "console.log(require('./public/templates/legacy-epic-template.json').name)"
+   ```
+   Should output: "Technical Epic Generator"
+
+---
+
+## **FINAL VERIFICATION FOR PHASE 0**
+
+### **Checklist - You should have these files:**
+
+```bash
+# Run this to verify
+ls -la
+```
+
+✅ **Project Root:**
+- `.claude-context.md` (Claude configuration)
+- `CODEBASE-AUDIT.md` (Hardcoded references)
+- `ARCHITECTURE-DIAGRAM.md` (Mermaid diagram)
+- `TEST-BASELINE.md` (Test results)
+- `EXAMPLE-LEGACY-OUTPUT.md` (Sample epic)
+
+✅ **src/ directory:**
+- `src/templates/schema.ts` (Template interfaces & validation)
+- `src/templates/schema.test.ts` (Schema tests)
+- `src/skills.test.ts` (Legacy behavior tests)
+
+✅ **public/templates/ directory:**
+- `public/templates/legacy-epic-template.json` (Legacy template JSON)
+
+### **Verify Everything Works:**
+
+1. **Run tests** (should have some passing, some failing):
+   ```bash
+   npm test
+   ```
+
+2. **Run the app** (should still work exactly as before):
+   ```bash
+   npm run dev
+   ```
+   - Open browser to `http://localhost:3002`
+   - Go through wizard
+   - Generate epic
+   - Should look identical to before
+
+3. **Commit your progress**:
+   ```bash
+   git add .
+   git commit -m "Phase 0 complete: Audit, tests, and template schema created"
+   ```
+
+---
+
+## **WHAT YOU'VE ACCOMPLISHED IN PHASE 0**
+
+You now have:
+1. **A complete map** of every hardcoded reference in your code
+2. **A safety net** of tests that capture current behavior
+3. **A blueprint** (schema) for how templates will work
+4. **The legacy template** extracted into a JSON file
+5. **Documentation** of your system's architecture
+6. **Version control** tracking every change
+
+**Next Step**: Phase 1 - Building the actual TemplateEngine that can load and run these templates!
+
+---
+
+**Need help? If ANY step fails or you see errors:**
+
+1. Copy the EXACT error message
+2. Ask Claude: "I'm following the Phase 0 guide and got this error: [paste error]. What went wrong and how do I fix it?"
+3. Or check that you: installed Node, are in the correct directory, saved all files
+
+**Ready for Phase 1?** Say "Proceed to Phase 1" and I'll give you the same level of detail for building the TemplateEngine!
