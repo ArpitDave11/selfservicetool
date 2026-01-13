@@ -1,915 +1,448 @@
-# **PHASE 1: BUILDING THE TEMPLATE ENGINE CORE**
-*Weeks 1-2: The Foundation That Makes Everything Dynamic*
+# **PHASE 1: REFACTOR TO TEMPLATE-DRIVEN UI**
+
+### **OBJECTIVES**
+1. Replace hardcoded `STAGES`/`EPIC_SECTIONS` with `TemplateRegistry`
+2. Create React context for template state management
+3. Build dynamic components that render purely from template data
+4. Add GitLab epic selector UI
+5. Implement template switching interface
 
 ---
 
-## **PHASE 1 GOAL**
-Create a **TemplateEngine** that can load templates from JSON, validate them, and execute them. By the end, you'll be able to run the legacy epic template through the new system and get **identical output** - but now it's dynamic, not hardcoded.
+## **STEP 1.1: Create Template React Context**
 
----
-
-## **TASK 1: CREATE TEMPLATE REGISTRY SERVICE** (45 minutes)
-
-### **What this means:**
-The TemplateRegistry is like a phone book for templates. It knows how to load them, store them in memory, and retrieve them when needed. This is the heart of the dynamic system.
-
-### **Step 1.1: Create the Registry File**
-
-1. **Create the file** (in your project root terminal):
-   ```bash
-   touch src/templates/TemplateRegistry.ts
-   code src/templates/TemplateRegistry.ts
-   ```
-
-2. **Give Claude this EXACT prompt** (copy everything):
 ```bash
-claude "Create a complete TemplateRegistry service for managing templates. The service should:
+# Create context for template state
+claude "Create src/templates/TemplateContext.tsx:
 
-1. Load templates from multiple sources (JSON files, localStorage, direct object)
-2. Cache templates in memory for performance
-3. Validate templates using Zod schema (use the EpicTemplateSchema from schema.ts)
-4. Provide methods:
-   - `loadTemplate(id: string, source: 'file' | 'local' | 'object')`
-   - `getTemplate(id: string): TemplateDefinition`
-   - `listTemplates(): TemplateDefinition[]`
-   - `clearCache()`
-   - `initializeDefaultTemplates()` - loads from public/templates/
+1. Interface: TemplateContextType
+   - activeTemplate: EpicTemplate | null
+   - registry: TemplateRegistry
+   - isLoading: boolean
+   - switchTemplate: (id: string) => void
+   - importFromGitLab: (groupId: string, epicIid: number) => Promise<void>
 
-5. Handle errors gracefully:
-   - Template not found → return null
-   - Invalid template → log error and return null
-   - Load failure → fallback to default
+2. Create context: const TemplateContext = createContext<TemplateContextType>(...)
 
-6. Export a singleton instance: `export const templateRegistry = new TemplateRegistry()`
+3. Hook: export const useTemplate = () => useContext(TemplateContext)
 
-7. Include full TypeScript typing
-8. Add JSDoc comments for all methods
-9. Make it work both in browser and Node.js environments
+4. Provider: TemplateProvider component
+   - Manages activeTemplate state
+   - Initializes registry
+   - Handles template switching
+   - Provides value to context consumers
 
-The file should be complete and ready to use. Include a loading state indicator for async operations."
+5. Wrap App.tsx with TemplateProvider in main.tsx
+
+Include TypeScript generics and error boundaries."
 ```
 
-3. **Wait for Claude's complete response** (1-2 minutes). It should give you a full TypeScript file.
+---
 
-4. **Copy the ENTIRE output** and paste it into `TemplateRegistry.ts`
+## **STEP 1.2: Create Dynamic Wizard Component**
 
-5. **Save the file** (Ctrl+S)
-
-### **Step 1.2: Test the Registry**
-
-1. **Create a test file**:
-   ```bash
-   touch src/templates/TemplateRegistry.test.ts
-   code src/templates/TemplateRegistry.test.ts
-   ```
-
-2. **Paste this test code**:
-```typescript
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { templateRegistry } from './TemplateRegistry';
-import type { TemplateDefinition } from './schema';
-
-describe('TemplateRegistry', () => {
-  beforeEach(() => {
-    // Clear cache before each test
-    templateRegistry.clearCache();
-  });
-
-  afterEach(() => {
-    // Clean up after tests
-    localStorage.clear();
-  });
-
-  it('should load template from JSON file', async () => {
-    const template = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    expect(template).toBeDefined();
-    expect(template?.id).toBe('legacy-epic-v1');
-    expect(template?.stages.length).toBe(6);
-    console.log('✅ Loaded template with', template?.stages.length, 'stages');
-  });
-
-  it('should cache loaded templates', async () => {
-    // First load (triggers file read)
-    const template1 = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    
-    // Second load (should use cache)
-    const template2 = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    
-    expect(template1).toBe(template2); // Same object reference = cached
-    console.log('✅ Template caching works');
-  });
-
-  it('should return null for non-existent template', async () => {
-    const template = await templateRegistry.loadTemplate('non-existent', 'file');
-    expect(template).toBeNull();
-    console.log('✅ Graceful error handling works');
-  });
-
-  it('should load from localStorage', async () => {
-    // Put a test template in localStorage
-    const testTemplate: TemplateDefinition = {
-      id: 'test-local',
-      name: 'Test Template',
-      version: '1.0.0',
-      stages: [
-        {
-          id: 'test-stage',
-          title: 'Test Stage',
-          description: 'A test stage',
-          fields: [
-            {
-              name: 'testField',
-              label: 'Test Field',
-              type: 'text',
-              required: true,
-              promptConfig: {
-                systemPrompt: 'Act as assistant',
-                userPromptTemplate: 'Help with {{fieldName}}'
-              }
-            }
-          ],
-          populatesSections: [1]
-        }
-      ],
-      outputSections: [
-        {
-          id: 'test-section',
-          title: 'Test Section',
-          fields: ['testField'],
-          isTable: false,
-          hasDiagram: false
-        }
-      ]
-    };
-
-    localStorage.setItem('template-test-local', JSON.stringify(testTemplate));
-    
-    const template = await templateRegistry.loadTemplate('test-local', 'local');
-    expect(template).toBeDefined();
-    expect(template?.name).toBe('Test Template');
-    console.log('✅ LocalStorage loading works');
-  });
-
-  it('should list all loaded templates', async () => {
-    await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    
-    const localTemplate: TemplateDefinition = {
-      id: 'local-test',
-      name: 'Local Test',
-      version: '1.0.0',
-      stages: [],
-      outputSections: []
-    };
-    localStorage.setItem('template-local-test', JSON.stringify(localTemplate));
-    await templateRegistry.loadTemplate('local-test', 'local');
-
-    const list = templateRegistry.listTemplates();
-    expect(list.length).toBeGreaterThanOrEqual(2);
-    console.log('✅ Listing templates works:', list.length, 'templates found');
-  });
-});
-```
-
-3. **Run the tests**:
-   ```bash
-   npm test TemplateRegistry
-   ```
-
-4. **What you should see**:
-   - All tests passing (or mostly passing)
-   - Console logs showing stages loading
-   - No red errors
-
-5. If tests fail, **ask Claude to fix**:
 ```bash
-claude "My TemplateRegistry tests are failing with this error: [paste error]. Please look at my TemplateRegistry.ts file and fix the issues. Here is the test output: [paste test output]"
+# Extract wizard logic from App.tsx into dynamic component
+claude "Create src/components/dynamic/DynamicWizard.tsx:
+
+1. Component: DynamicWizard
+   - Props: { className?: string }
+
+2. Use useTemplate() to get activeTemplate
+   - If no template, show 'Loading templates...'
+
+3. State:
+   - currentStageIndex: number
+   - stageData: Record<string, RefinedData>
+   - formData: Record<string, string>
+   - loadingSuggestion: Record<string, boolean>
+
+4. Render:
+   - DynamicProgressIndicator (from template.stages)
+   - Current stage fields (from template.stages[currentStageIndex].fields)
+   - Navigation buttons (Next/Previous/Generate)
+
+5. Methods:
+   - handleFieldChange(fieldId, value)
+   - handleRefine(fieldId, mode)
+   - handleNextStage()
+   - handlePrevStage()
+   - handleGenerateEpic()
+
+6. Use useCallback for all handlers
+
+7. Preserve all existing UI styles (UBS branding, glass morphism)
+
+This replaces the hardcoded wizard in App.tsx."
 ```
-
-### **Step 1.3: Integrate Registry into App**
-
-1. **Open App.tsx**:
-   ```bash
-   code src/App.tsx
-   ```
-
-2. **Add import at the top** (after other imports):
-```typescript
-import { templateRegistry } from './templates/TemplateRegistry';
-```
-
-3. **Add a testing button** (temporarily) to verify registry works:
-   - Find the `return (` in the App component
-   - Add this button right after the opening `<div style={styles.container}>`:
-```tsx
-{/* TEMPORARY: Test Template Registry */}
-<button 
-  onClick={async () => {
-    const template = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    alert(`Loaded template: ${template?.name || 'FAILED'}\nStages: ${template?.stages.length}`);
-  }}
-  style={{ 
-    position: 'fixed', 
-    top: '10px', 
-    right: '10px', 
-    zIndex: 9999,
-    padding: '10px',
-    background: 'green',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px'
-  }}
->
-  TEST REGISTRY
-</button>
-```
-
-4. **Save App.tsx**
-
-5. **Test in browser**:
-   - Run app: `npm run dev`
-   - Click the green "TEST REGISTRY" button
-   - Should see alert: "Loaded template: Technical Epic Generator" with "Stages: 6"
-
-6. **Remove the test button** after it works (delete those lines)
 
 ---
 
-## **TASK 2: CREATE DYNAMIC STAGE RENDERER** (60 minutes)
+## **STEP 1.3: Create Dynamic Progress Indicator**
 
-### **What this means:**
-Instead of hardcoding 6 stages, we'll create a component that can render ANY stage from ANY template. It takes a stage definition and builds the UI dynamically.
-
-### **Step 2.1: Create Dynamic Stage Component**
-
-1. **Create the component file**:
-   ```bash
-   touch src/templates/DynamicStageRenderer.tsx
-   code src/templates/DynamicStageRenderer.tsx
-   ```
-
-2. **Give Claude this EXACT prompt**:
 ```bash
-claude "Create a DynamicStageRenderer React component that can render any stage from any template. The component should:
+# Create progress component that renders from template
+claude "Create src/components/dynamic/DynamicProgress.tsx:
 
-1. Accept props:
-   - `stage`: StageDefinition (from template)
-   - `formData`: Record<string, string> (current field values)
-   - `onFieldChange`: (fieldName, value) => void
-   - `onRefine`: () => void (callback for refine action)
-   - `isGenerating`: boolean (loading state)
+1. Component: DynamicProgressIndicator
+   - Props: { 
+       stages: TemplateStage[], 
+       currentIndex: number,
+       onStageClick?: (index: number) => void 
+     }
 
-2. Render fields dynamically based on `stage.fields`:
-   - text → <input type='text'>
-   - textarea → <textarea>
-   - select → <select> with options
-   - multiselect → checkboxes or multi-select dropdown
-   - number → <input type='number'>
-   - date → <input type='date'>
+2. Render:
+   - Map stages to progress dots
+   - Map 'epic' as final step
+   - Show stage labels below dots
+   - Highlight active/completed stages
 
-3. Show field labels, placeholders, and required indicators
-4. Render 'Refine' and 'Auto' suggestion buttons per field
-5. Show loading states during AI operations
-6. Display alternative suggestions when available
-7. Show refined output section per field
-8. Include edit functionality for refined content
+3. Styles:
+   - Same as existing progress (red/black gradients)
+   - Active: Red pulse animation
+   - Completed: Black checkmark
 
-9. Use the existing styles from src/App.tsx (import and reuse)
-10. Be completely generic - never assume 6 stages or epic-specific fields
-11. Include TypeScript interfaces for all props
-12. Export as default component
+4. Make clickable if onStageClick provided (for navigation)
 
-The component should be a drop-in replacement for the hardcoded renderWizard() function. It should work with the legacy epic template and any future template.
+5. Responsive: Wrap on mobile
 
-Provide the complete, ready-to-use TSX file with all imports and types."
+Include Storybook-style comment with usage example."
 ```
-
-3. **Copy Claude's complete response** into `DynamicStageRenderer.tsx`
-
-4. **Save the file**
-
-### **Step 2.2: Test the Dynamic Renderer**
-
-1. **Create test file**:
-   ```bash
-   touch src/templates/DynamicStageRenderer.test.tsx
-   code src/templates/DynamicStageRenderer.test.tsx
-   ```
-
-2. **Paste this test**:
-```typescript
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import DynamicStageRenderer from './DynamicStageRenderer';
-import type { StageDefinition } from './schema';
-import { templateRegistry } from './TemplateRegistry';
-
-describe('DynamicStageRenderer', () => {
-  it('should render fields for a stage', async () => {
-    // Load the legacy template
-    const template = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    expect(template).toBeDefined();
-
-    const projectStage = template!.stages[0]; // "Project" stage
-    
-    render(
-      <DynamicStageRenderer
-        stage={projectStage}
-        formData={{}}
-        onFieldChange={() => {}}
-        onRefine={() => {}}
-        isGenerating={false}
-      />
-    );
-
-    // Check that fields are rendered
-    expect(screen.getByLabelText(/Project Name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Background & Context/i)).toBeInTheDocument();
-    console.log('✅ Fields rendered dynamically');
-  });
-
-  it('should show required indicators', async () => {
-    const template = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    const projectStage = template!.stages[0];
-
-    render(
-      <DynamicStageRenderer
-        stage={projectStage}
-        formData={{}}
-        onFieldChange={() => {}}
-        onRefine={() => {}}
-        isGenerating={false}
-      />
-    );
-
-    // Project Name is required (has asterisk or required attribute)
-    const projectNameLabel = screen.getByLabelText(/Project Name/i);
-    expect(projectNameLabel).toBeRequired();
-    console.log('✅ Required fields marked correctly');
-  });
-
-  it('should call onFieldChange when typing', async () => {
-    const template = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    const projectStage = template!.stages[0];
-    
-    let changedField = '';
-    let changedValue = '';
-    
-    render(
-      <DynamicStageRenderer
-        stage={projectStage}
-        formData={{}}
-        onFieldChange={(field, value) => {
-          changedField = field;
-          changedValue = value;
-        }}
-        onRefine={() => {}}
-        isGenerating={false}
-      />
-    );
-
-    const input = screen.getByLabelText(/Project Name/i) as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Test Project' } });
-
-    expect(changedField).toBe('projectName');
-    expect(changedValue).toBe('Test Project');
-    console.log('✅ Field changes handled correctly');
-  });
-});
-```
-
-3. **Run tests**:
-   ```bash
-   npm test DynamicStageRenderer
-   ```
-
-4. **Fix any errors** by asking Claude.
 
 ---
 
-## **TASK 3: CREATE TEMPLATE MODEL** (30 minutes)
+## **STEP 1.4: Create Dynamic Stage Renderer**
 
-### **What this means:**
-This manages the state and logic for a running template instance - tracking which stage you're on, storing data, and handling navigation.
-
-### **Step 3.1: Create TemplateModel Class**
-
-1. **Create the file**:
-   ```bash
-   touch src/templates/TemplateModel.ts
-   code src/templates/TemplateModel.ts
-   ```
-
-2. **Give Claude this prompt**:
 ```bash
-claude "Create a TemplateModel class that manages the runtime state of a template. It should:
+# Create component to render any stage from template
+claude "Create src/components/dynamic/StageRenderer.tsx:
 
-1. Accept a TemplateDefinition in constructor
-2. Manage current stage index (navigation)
-3. Store form data for all stages (in-memory)
-4. Store refined data for all stages
-5. Provide methods:
-   - `currentStage()`: StageDefinition
-   - `nextStage()`: void
-   - `previousStage()`: void
-   - `isLastStage()`: boolean
-   - `isFirstStage()`: boolean
-   - `setFieldValue(fieldName, value)`: void
-   - `getFieldValue(fieldName)`: string
-   - `setRefinedData(fieldName, original, refined, diagramNode)`: void
-   - `getRefinedData()`: RefinedData
-   - `canProceed()`: boolean (checks if required fields filled)
-   - `reset()`: void (start over)
-   - `getProgress()`: { current: number, total: number }
+1. Component: StageRenderer
+   - Props: { 
+       stage: TemplateStage,
+       formData: Record<string, string>,
+       stageData: Record<string, RefinedData>,
+       onFieldChange: (fieldId, value) => void,
+       onRefine: (fieldId, mode) => void,
+       loadingSuggestion: Record<string, boolean>
+     }
 
-6. Calculate populated sections dynamically based on stage data
-7. Provide `onStageChange` callback for UI updates
-8. Be generic - work with any template, not just epic
-9. Include full TypeScript types
-10. Export the class and create a hook for React: `useTemplateModel(templateId)`
+2. Render:
+   - Stage title: 'Stage {index + 1}: {stage.title}'
+   - Stage description: {stage.description}
+   - Help banner (same as existing)
 
-The model should completely replace the current useState-based state management in App.tsx for stages and data.
+3. For each field:
+   - Label with required indicator
+   - Dual-mode buttons (Refine/Auto)
+   - Input (text/textarea)
+   - Loading shimmer
+   - Alternative suggestions
+   - Refined content (if available)
+   - Edit button
 
-Provide the complete, ready-to-use TypeScript file with all methods implemented."
-```
+4. Use template field definitions for:
+   - placeholder
+   - type
+   - required validation
 
-3. **Copy Claude's complete response** into `TemplateModel.ts`
+5. Maintain all existing styles and animations
 
-4. **Save the file**
-
-### **Step 3.2: Test the TemplateModel**
-
-1. **Create test file**:
-   ```bash
-   touch src/templates/TemplateModel.test.ts
-   code src/templates/TemplateModel.test.ts
-   ```
-
-2. **Paste this test**:
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { TemplateModel } from './TemplateModel';
-import { templateRegistry } from './TemplateRegistry';
-
-describe('TemplateModel', () => {
-  let model: TemplateModel;
-
-  beforeEach(async () => {
-    const template = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    expect(template).toBeDefined();
-    model = new TemplateModel(template!);
-  });
-
-  it('should start at first stage', () => {
-    const stage = model.currentStage();
-    expect(stage.id).toBe('project');
-    console.log('✅ Starts at first stage');
-  });
-
-  it('should navigate through stages', () => {
-    expect(model.isFirstStage()).toBe(true);
-    expect(model.isLastStage()).toBe(false);
-
-    model.nextStage();
-    expect(model.currentStage().id).toBe('objective_scope');
-    expect(model.isFirstStage()).toBe(false);
-
-    // Navigate to last stage
-    while (!model.isLastStage()) {
-      model.nextStage();
-    }
-    expect(model.currentStage().id).toBe('delivery');
-    expect(model.isLastStage()).toBe(true);
-    console.log('✅ Navigation works correctly');
-  });
-
-  it('should go back to previous stages', () => {
-    model.nextStage(); // project → objective_scope
-    model.nextStage(); // objective_scope → architecture
-    
-    model.previousStage();
-    expect(model.currentStage().id).toBe('objective_scope');
-    console.log('✅ Previous navigation works');
-  });
-
-  it('should store and retrieve field values', () => {
-    model.setFieldValue('projectName', 'My Project');
-    expect(model.getFieldValue('projectName')).toBe('My Project');
-    console.log('✅ Field value storage works');
-  });
-
-  it('should track refined data', () => {
-    model.setRefinedData('projectName', 'My Project', '**Project:** My Project', 'Project["My Project"]');
-    
-    const refined = model.getRefinedData();
-    expect(refined.projectName).toBeDefined();
-    expect(refined.projectName.original).toBe('My Project');
-    expect(refined.projectName.refined).toBe('**Project:** My Project');
-    console.log('✅ Refined data tracking works');
-  });
-
-  it('should validate required fields', () => {
-    const projectStage = model.currentStage(); // Project stage
-    const requiredFields = projectStage.fields.filter(f => f.required);
-    
-    // Should not be able to proceed without required fields
-    expect(model.canProceed()).toBe(false);
-    
-    // Fill in required field
-    model.setFieldValue('projectName', 'Test');
-    
-    expect(model.canProceed()).toBe(true);
-    console.log('✅ Required field validation works');
-  });
-
-  it('should calculate progress', () => {
-    const progress = model.getProgress();
-    expect(progress.current).toBe(0); // Starting stage
-    expect(progress.total).toBe(6); // Legacy template has 6 stages
-
-    model.nextStage();
-    const newProgress = model.getProgress();
-    expect(newProgress.current).toBe(1);
-    console.log('✅ Progress tracking works');
-  });
-});
-```
-
-3. **Run tests**:
-   ```bash
-   npm test TemplateModel
-   ```
-
-4. **Fix any errors** by asking Claude.
-
----
-
-## **TASK 4: INTEGRATE INTO APP.TSX** (60 minutes)
-
-### **What this means:**
-Replace the hardcoded wizard in App.tsx with our new dynamic system. This is the **big moment** where everything comes together.
-
-### **Step 4.1: Update App.tsx Imports and State**
-
-1. **Open App.tsx**:
-   ```bash
-   code src/App.tsx
-   ```
-
-2. **Replace the imports section** (top of file, after `import mermaid from 'mermaid'`) with:
-
-```typescript
-// NEW: Dynamic Template System
-import { templateRegistry } from './templates/TemplateRegistry';
-import { TemplateModel } from './templates/TemplateModel';
-import DynamicStageRenderer from './templates/DynamicStageRenderer';
-import type { TemplateDefinition } from './templates/schema';
-```
-
-3. **Replace the state declarations** (look for `const [state, setState] = useState<EpicState>`):
-   - **Remove** these lines:
-     ```typescript
-     const [state, setState] = useState<EpicState>(initialState);
-     const [formData, setFormData] = useState<Record<string, string>>({});
-     const [editingRefined, setEditingRefined] = useState<Record<string, boolean>>({});
-     const [alternatives, setAlternatives] = useState<Record<string, string[]>>({});
-     const [isRefining, setIsRefining] = useState(false);
-     ```
-
-   - **Replace with** these new lines:
-     ```typescript
-     // NEW: Dynamic template state
-     const [currentTemplateId, setCurrentTemplateId] = useState<string>('legacy-epic-v1');
-     const [templateModel, setTemplateModel] = useState<TemplateModel | null>(null);
-     const [isRefining, setIsRefining] = useState(false);
-     ```
-
-4. **Initialize the template model** (add this after the state declarations):
-   ```typescript
-   // Initialize template model
-   useEffect(() => {
-     const initTemplate = async () => {
-       const template = await templateRegistry.loadTemplate(currentTemplateId, 'file');
-       if (template) {
-         setTemplateModel(new TemplateModel(template));
-       }
-     };
-     initTemplate();
-   }, [currentTemplateId]);
-   ```
-
-### **Step 4.2: Replace renderWizard() Function**
-
-1. **Find the `renderWizard()` function** in App.tsx (it's a big function)
-
-2. **Replace the ENTIRE function** with this simplified version:
-
-```typescript
-// NEW: Dynamic wizard renderer
-const renderWizard = () => {
-  if (!templateModel) {
-    return <div>Loading template...</div>;
-  }
-
-  const currentStage = templateModel.currentStage();
-  
-  return (
-    <div style={styles.card} className="main-card">
-      <div style={styles.stageTitle}>
-        Stage {templateModel.getProgress().current + 1}: {currentStage.title}
-      </div>
-      <div style={styles.stageDesc}>{currentStage.description}</div>
-      
-      <DynamicStageRenderer
-        stage={currentStage}
-        formData={templateModel.getAllFieldValues()} // You'll need to add this method
-        onFieldChange={(fieldName, value) => {
-          templateModel.setFieldValue(fieldName, value);
-        }}
-        onRefine={async () => {
-          setIsRefining(true);
-          // TODO: Implement refinement logic
-          setIsRefining(false);
-        }}
-        isGenerating={isRefining}
-      />
-
-      <div style={styles.buttonRow}>
-        {!templateModel.isFirstStage() && (
-          <button style={styles.button(false)} onClick={() => templateModel.previousStage()}>
-            <ArrowLeft size={16} strokeWidth={2} style={{ marginRight: 6 }} />
-            Previous
-          </button>
-        )}
-        <button
-          style={styles.button(true)}
-          onClick={() => {
-            if (templateModel.isLastStage()) {
-              generateEpic(); // We'll refactor this next
-            } else {
-              templateModel.nextStage();
-            }
-          }}
-          disabled={isRefining}
-        >
-          {templateModel.isLastStage() ? (
-            <>
-              <FileText size={16} strokeWidth={2} style={{ marginRight: 6 }} />
-              Generate
-            </>
-          ) : (
-            <>
-              Next
-              <ArrowRight size={16} strokeWidth={2} style={{ marginLeft: 6 }} />
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Progress indicator */}
-      <div style={{ marginTop: '24px' }}>
-        <div style={{ fontSize: '14px' }}>Progress: {templateModel.getProgress().current + 1} / {templateModel.getProgress().total}</div>
-        <div style={{ padding: '8px', background: '#f3f4f6', borderRadius: '6px', marginTop: '8px' }}>
-          <div style={{ 
-            height: '8px', 
-            background: '#E60000', 
-            borderRadius: '4px',
-            width: `${((templateModel.getProgress().current + 1) / templateModel.getProgress().total) * 100}%`
-          }} />
-        </div>
-      </div>
-    </div>
-  );
-};
-```
-
-3. **Add this method to TemplateModel** (open `src/templates/TemplateModel.ts`):
-```typescript
-// Add this method to the TemplateModel class
-public getAllFieldValues(): Record<string, string> {
-  const values: Record<string, string> = {};
-  Object.keys(this.fieldValues).forEach(key => {
-    values[key] = this.fieldValues[key];
-  });
-  return values;
-}
-```
-
-### **Step 4.3: Simplify App.tsx by Removing Old Code**
-
-1. **Remove these unused imports** from App.tsx:
-   ```typescript
-   // Remove these lines:
-   import { STAGES, EPIC_SECTIONS, type EpicState, type ChatMessage, type ChatState } from './types';
-   ```
-
-2. **Remove unused state variables** (search for and delete):
-   ```typescript
-   // Remove these lines:
-   const [alternatives, setAlternatives] = useState<Record<string, string[]>>({});
-   const [editingRefined, setEditingRefined] = useState<Record<string, boolean>>({});
-   ```
-
-3. **Remove the legacy state interface** (at the top of the file):
-   ```typescript
-   // Remove:
-   const initialState: EpicState = {
-     currentStage: 0,
-     data: {},
-     diagramNodes: [],
-     generatedEpic: null,
-   };
-   ```
-
-### **Step 4.4: Update generateEpic Function**
-
-1. **Find the `generateEpic` function** in App.tsx
-
-2. **Replace it with this dynamic version**:
-```typescript
-const generateEpic = async () => {
-  if (!templateModel) return;
-
-  setIsGenerating(true);
-  const projectName = templateModel.getFieldValue('projectName') || 'Untitled Project';
-
-  try {
-    // Use the template model's refined data
-    const refinedData = templateModel.getRefinedData();
-    
-    // Generate output using template definition
-    const template = await templateRegistry.getTemplate(currentTemplateId);
-    if (!template) throw new Error('Template not found');
-
-    let output = `# ${template.name}: ${projectName}\n\n`;
-    output += `*Generated on ${new Date().toLocaleDateString()}*\n\n---\n\n`;
-
-    // Dynamically generate sections based on template
-    template.outputSections.forEach((section, index) => {
-      output += `## ${index + 1}. ${section.title}\n\n`;
-      
-      // Get content from refined data
-      const content = section.fields
-        .map(fieldId => refinedData[fieldId]?.refined)
-        .filter(Boolean)
-        .join('\n\n') || '_Content to be defined_';
-      
-      output += `${content}\n\n`;
-    });
-
-    // Set the generated epic
-    setEditableEpic(output);
-    setState(prev => ({ ...prev, generatedEpic: output }));
-    
-    triggerConfetti();
-    showToast('success', 'Document Generated!', `Generated from ${template.name}`);
-  } catch (error) {
-    console.error('Generation failed:', error);
-    showToast('error', 'Generation Failed', error.message);
-  } finally {
-    setIsGenerating(false);
-  }
-};
+Make it a pure component - no business logic, just rendering."
 ```
 
 ---
 
-## **TASK 5: TEST THE INTEGRATION** (30 minutes)
+## **STEP 1.5: Create Dynamic Field Renderer**
 
-### **Step 5.1: Test in Browser**
-
-1. **Start the app**:
-   ```bash
-   npm run dev
-   ```
-
-2. **Open browser** to `http://localhost:3002`
-
-3. **What you should see**:
-   - The wizard should load
-   - It should show "Stage 1: Project" (just like before)
-   - Fields should appear: "Project Name" and "Background & Context"
-   - Navigation buttons should work (Next/Previous)
-   - Progress bar should show progress
-
-4. **Click through all stages**:
-   - Should see 6 stages total
-   - Each stage should have the right fields
-   - At the end, clicking "Generate" should create a document
-
-### **Step 5.2: Run Full Test Suite**
-
-1. In terminal:
-   ```bash
-   npm test
-   ```
-
-2. **You should see**:
-   - TemplateRegistry tests: PASSING
-   - TemplateModel tests: PASSING
-   - DynamicStageRenderer tests: PASSING (or mostly passing)
-   - Legacy tests: Some may fail (expected - we changed the system)
-
-3. **Commit your progress**:
 ```bash
-git add .
-git commit -m "Phase 1 complete: Dynamic Template Engine integrated"
+# Create lowest-level field component
+claude "Create src/components/dynamic/FieldRenderer.tsx:
+
+1. Component: DynamicField
+   - Props: {
+       field: TemplateField,
+       value: string,
+       refinedValue?: string,
+       isLoading: boolean,
+       alternatives?: string[],
+       onChange: (value) => void,
+       onRefine: (mode: 'with-context' | 'auto') => void,
+       onUseAlternative: (value) => void,
+       onEditRefined: (value) => void
+     }
+
+2. Handles:
+   - Text input vs textarea
+   - Typewriter effect
+   - Suggestion buttons
+   - Alternative chips
+   - Refined section (editable)
+   - All styles and transitions
+
+3. Pure rendering component
+
+4. Use forwardRef if needed for focusing
+
+This will be used by StageRenderer."
 ```
 
 ---
 
-## **TASK 6: CREATE A NEW TEST TEMPLATE** (30 minutes)
+## **STEP 1.6: Refactor App.tsx to Use Template Context**
 
-### **What this means:**
-Prove the system is truly dynamic by creating a completely different template that works with the same engine.
-
-### **Step 6.1: Create Simple Meeting Notes Template**
-
-1. **Create new template JSON**:
-   ```bash
-   touch public/templates/meeting-notes-template.json
-   code public/templates/meeting-notes-template.json
-   ```
-
-2. **Give Claude this prompt**:
 ```bash
-claude "Create a simple Meeting Notes template JSON with:
-1. 3 stages: Meeting Info, Participants & Notes, Action Items
-2. Total of 5-6 fields across all stages
-3. 4 output sections: Summary, Participants, Notes, Action Items
-4. Simple prompts for each field
-5. id: 'meeting-notes-v1'
-6. name: 'Meeting Notes'
+# Massive refactoring of main App.tsx
+claude "Refactor src/App.tsx:
 
-Make it follow the TemplateDefinition schema. Output as complete JSON I can copy-paste."
+1. REMOVE all hardcoded references:
+   - Remove import { STAGES, EPIC_SECTIONS } from './types'
+   - Remove currentStage logic based on STAGES array
+   - Remove populatedSections calculation based on EPIC_SECTIONS
+
+2. ADD template context:
+   - Import { useTemplate } from './templates/TemplateContext'
+   - Import DynamicWizard from './components/dynamic/DynamicWizard'
+   - Remove local wizard rendering logic
+
+3. Simplify App.tsx structure:
+   - Header (keep)
+   - Progress indicator (replace with DynamicProgress)
+   - DynamicWizard component (replaces renderWizard)
+   - Keep epic editor, blueprint, settings
+   - Remove all wizard state management (moved to DynamicWizard)
+
+4. Keep only:
+   - Config state (Azure, GitLab)
+   - Toast system
+   - Chat system
+   - Blueprint state
+   - Epic editor state
+
+5. Template management UI:
+   - Add template selector dropdown in header
+   - Show active template name
+   - Add 'Manage Templates' button
+
+Result: App.tsx goes from 1500+ lines to ~800 lines
+Wizard logic completely extracted to dynamic components."
 ```
-
-3. **Copy the JSON** Claude gives you into the file and save.
-
-### **Step 6.2: Test the New Template**
-
-1. **Temporarily change the template ID** in App.tsx (find this line):
-   ```typescript
-   const [currentTemplateId, setCurrentTemplateId] = useState<string>('legacy-epic-v1');
-   ```
-
-2. **Change to**:
-   ```typescript
-   const [currentTemplateId, setCurrentTemplateId] = useState<string>('meeting-notes-v1');
-   ```
-
-3. **Reload the browser** (should auto-reload)
-
-4. **You should see**:
-   - A completely different wizard (3 stages)
-   - Different field names
-   - Different output structure
-
-5. **Change it back** to `'legacy-epic-v1'` after testing
 
 ---
 
-## **PHASE 1 COMPLETION CHECKLIST**
+## **STEP 1.7: Add GitLab Epic Selector UI**
 
-### **✅ You Should Now Have These Files:**
 ```bash
-# Verify by running:
-ls src/templates/
+# Create UI for selecting epics from GitLab
+claude "Create src/components/gitlab/EpicSelector.tsx:
+
+1. Component: GitLabEpicSelector
+   - Props: { onEpicSelect: (epic: GitLabEpic) => void }
+
+2. State:
+   - rootGroupId: string (from VITE_GITLAB_ROOT_GROUP_ID)
+   - loading: boolean
+   - epics: GitLabEpic[]
+   - error: string | null
+
+3. Use GitLabApiClient:
+   - Initialize with token from env
+   - Call fetchEpicsRecursively in useEffect
+
+4. Render:
+   - Loading state (skeleton)
+   - Error state
+   - Tree view of groups/subgroups with epics
+   - Each epic clickable to select
+
+5. Style: Match UBS branding
+
+Include 'Import as Template' button for template epics."
 ```
-
-Expected files:
-- `TemplateRegistry.ts` - Loads and manages templates
-- `TemplateRegistry.test.ts` - Tests for registry
-- `DynamicStageRenderer.tsx` - Renders any stage
-- `DynamicStageRenderer.test.tsx` - Tests for renderer
-- `TemplateModel.ts` - Manages template state
-- `TemplateModel.test.ts` - Tests for model
-- `schema.ts` - Template types and validation
-- `schema.test.ts` - Schema tests
-
-### **✅ Functionality Verified:**
-- [ ] App loads without errors
-- [ ] Wizard shows stages from template (6 for legacy)
-- [ ] Can navigate between stages
-- [ ] Fields render correctly
-- [ ] Generate button creates output
-- [ ] Tests pass (most of them)
-- [ ] Can switch to meeting notes template (3 stages)
-
-### **✅ Code Quality:**
-- [ ] No TypeScript errors (`npx tsc --noEmit`)
-- [ ] Git history shows clean commits
-- [ ] Tests have good coverage
 
 ---
 
-## **WHAT'S NEXT?**
+## **STEP 1.8: Add Template Management UI**
+
+```bash
+# Create template management panel
+claude "Create src/components/template/TemplateManager.tsx:
+
+1. Component: TemplateManager
+   - Shows list of registered templates
+   - Shows which are from GitLab
+   - Shows active status
+
+2. Features:
+   - Import new template (JSON upload)
+   - Fetch from GitLab (opens EpicSelector)
+   - Export template (JSON download)
+   - Activate template (switchTemplate)
+   - Delete template (if not active)
+
+3. Integration:
+   - Use useTemplate() for state
+   - Use TemplateRegistry for operations
+
+4. Modal or slide-out panel
+
+Include search/filter functionality."
+```
+
+---
+
+## **STEP 1.9: Update Type Definitions**
+
+```bash
+# Update types.ts to remove hardcoded constants
+claude "Modify src/types/types.ts:
+
+1. KEEP the interfaces (Stage, StageField, EpicSection) but:
+   - Rename to LegacyStage, LegacyEpicSection to avoid conflicts
+   - Add @deprecated JSDoc
+
+2. ADD comment:
+   // @deprecated - Use EpicTemplate from templates/schemas/template.types.ts
+   // These are kept for backward compatibility during migration
+
+3. DO NOT remove STAGES and EPIC_SECTIONS yet (will be removed in Phase 2)
+
+4. Add export statement:
+   export { EpicTemplate, TemplateStage, TemplateField } from '../templates/schemas/template.types'
+
+This prepares for removal while maintaining compatibility."
+```
+
+---
+
+## **STEP 1.10: Update Main Entry Point**
+
+```bash
+# Wrap app with TemplateProvider
+claude "Modify src/main.tsx:
+
+import { TemplateProvider } from './templates/TemplateContext';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <TemplateProvider>
+      <App />
+    </TemplateProvider>
+  </StrictMode>
+);
+
+Add error boundary:
+<ErrorBoundary fallback={<div>Template system error</div>}>
+  <TemplateProvider>
+    <App />
+  </TemplateProvider>
+</ErrorBoundary>"
+```
+
+---
+
+## **STEP 1.11: Create Integration Tests**
+
+```bash
+# Test template-driven rendering
+claude "Create src/__tests__/phase1-integration.test.tsx:
+
+Test suites:
+
+1. 'TemplateContext'
+   - Provides active template to consumers
+   - Handles template switching
+   - Imports from GitLab correctly
+
+2. 'DynamicWizard'
+   - Renders stages from active template
+   - Navigates between stages
+   - Calls onComplete with stage data
+
+3. 'DynamicProgress'
+   - Shows all stages from template
+   - Highlights current stage
+   - Shows epic as final step
+
+4. 'StageRenderer'
+   - Renders all fields for a stage
+   - Calls onFieldChange on input
+   - Shows refined content when available
+
+5. 'EpicSelector'
+   - Fetches epics recursively
+   - Calls onEpicSelect when clicked
+   - Handles errors gracefully
+
+Use @testing-library/react and mock TemplateRegistry."
+```
+
+---
+
+## **STEP 1.12: Commit Phase 1**
+
+```bash
+# Commit the massive refactoring
+claude "Execute:
+git add -A
+git commit -m 'feat: Phase 1 - Template-Driven UI Refactor
+
+Migrate from hardcoded STAGES to dynamic template system:
+
+- React context for template state (TemplateContext)
+- DynamicWizard component replacing inline wizard logic
+- DynamicProgress, StageRenderer, FieldRenderer components
+- Refactored App.tsx (reduced from 1500 to ~800 lines)
+- GitLab EpicSelector UI component
+- TemplateManager for template CRUD operations
+- All UI now renders from active EpicTemplate
+- Preserves UBS branding and styling
+
+BREAKING CHANGE: App.tsx structure changed - all wizard logic moved
+Closes: phase1-refactor'
+"
+```
+
+---
+
+## **PHASE 1 DELIVERABLES**
+
+✅ **Template React Context**: Global template state  
+✅ **Dynamic Wizard**: Renders from any template  
+✅ **Dynamic Components**: Progress, Stage, Field renderers  
+✅ **Refactored App.tsx**: Clean, template-agnostic  
+✅ **GitLab Epic Selector**: UI for fetching epics  
+✅ **Template Manager**: CRUD interface  
+✅ **Tests**: Integration tests for all new components  
+✅ **Backward Compatible**: Legacy template still works  
+
+---
+
+## **KEY CHANGES IN APP.TSX**
+
+**Before (Phase 0):**
+```typescript
+// Hardcoded
+const currentStage = STAGES[state.currentStage];
+const populatedSections = getPopulatedSections(); // Uses EPIC_SECTIONS
+```
+
+**After (Phase 1):**
+```typescript
+// Dynamic
+const { activeTemplate } = useTemplate();
+const currentStage = activeTemplate.stages[state.currentStage];
+const populatedSections = getPopulatedSections(activeTemplate); // Uses template
+```
+
+---
+
+## **READY FOR PHASE 2?**
 
 **Phase 2** will focus on:
-- Dynamic output generation (no more hardcoded 17 sections)
-- AI prompt template system (prompts in JSON, not code)
-- Advanced features like conditional sections
-- Template builder UI
+1. **Parameterizing AI Skills**: Move all prompts from `skills.ts` into templates
+2. **Dynamic Diagram Generation**: Connect diagram system to templates
+3. **Critique Agent Integration**: Validate templates and generated content
+4. **Remove Legacy Constants**: Delete hardcoded STAGES/EPIC_SECTIONS
 
-**You've just built a fully dynamic template engine!** The app now runs on templates instead of hardcoded logic. This is the foundation for unlimited template types.
-
-**Ready for Phase 2?** Say "Proceed to Phase 2" to continue!
+Would you like me to proceed with **Phase 2** implementation?
