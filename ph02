@@ -1,742 +1,566 @@
-# **PHASE 2: DYNAMIC OUTPUT GENERATION & AI PROMPT SYSTEM**
-*Weeks 3-4: Making AI and Content Fully Template-Driven*
+# **PHASE 2: AI SKILLS PARAMETERIZATION & DYNAMIC DIAGRAMS**
+
+### **OBJECTIVES**
+1. **Move ALL AI prompts** from `skills.ts` into template definitions
+2. **Refactor skills** to be template-aware (no hardcoded logic)
+3. **Make diagrams dynamic** - template specifies type, prompts, and generation
+4. **Integrate Critique Agent** to validate template compliance
+5. **Create Template Editor UI** for managing prompts and diagram config
+6. **Remove legacy constants** (`STAGES`, `EPIC_SECTIONS`)
 
 ---
 
-## **PHASE 2 GOAL**
-Replace hardcoded 17-section generation with **template-driven output** and move **ALL AI prompts** from code into template definitions. Your templates will now control BOTH the structure AND the AI behavior.
+## **STEP 2.1: Refactor Template Schema for AI Configuration**
+
+```bash
+# Update template schema with AI and diagram config
+claude "Update src/templates/schemas/template.types.ts:
+
+1. ADD to TemplateField:
+   aiPrompt?: {
+     systemPrompt: string;
+     userPromptTemplate: string;
+     contextFields: string[]; // Fields to include in context
+     modeSupport: ('refine' | 'auto')[];
+     maxTokens?: number;
+     temperature?: number;
+   }
+
+2. ADD to EpicTemplate:
+   prompts: {
+     systemPrompts: Record<string, string>;
+     generationPrompt: string;
+     diagramPrompt?: string;
+     critiquePrompt?: string;
+   }
+   diagramConfig: {
+     supportedTypes: ('c4-container' | 'sequence' | 'deployment' | 'component' | 'plantuml')[];
+     defaultType: string;
+     generationStrategy: 'ai' | 'rule-based';
+     maxNodes: number;
+     layout: 'LR' | 'TB';
+     fieldExtraction?: {
+       components: string[]; // Field IDs for component extraction
+       dataStores: string[];
+       actors: string[];
+     }
+   }
+
+3. ADD Critique configuration:
+   critiqueConfig?: {
+     enabled: boolean;
+     rules: string[]; // Custom validation rules
+     severity: 'low' | 'medium' | 'high';
+   }
+
+4. UPDATE EpicSection:
+   dataMappings: string[]; // Field IDs to inject
+   formatting: 'table' | 'list' | 'checkbox' | 'subsection' | 'custom';
+   template: string; // EJS-like template string
+
+Include JSDoc examples for each new field."
+```
 
 ---
 
-## **TASK 1: CREATE DYNAMIC OUTPUT GENERATOR** (60 minutes)
+## **STEP 2.2: Extract Prompts from skills.ts into Default Template**
 
-### **What this means:**
-Build a service that takes ANY template and ANY data, and produces a formatted document (markdown, HTML, etc.). It's like a universal printer for templates.
-
-### **Step 1.1: Create Output Generator Service**
-
-1. **Create the file** (in terminal):
-   ```bash
-   touch src/templates/DynamicOutputGenerator.ts
-   code src/templates/DynamicOutputGenerator.ts
-   ```
-
-2. **Copy and paste this EXACT prompt into Claude**:
 ```bash
-claude "Create a complete DynamicOutputGenerator service that:
+# Create migration that extracts prompts
+claude "Update src/utils/templates/migrations.ts:
 
-1. Accepts:
-   - `template: TemplateDefinition` (from our schema)
-   - `data: RefinedData` (field values)
-   - `options?: { format: 'markdown' | 'html', includeMetadata: boolean }`
+1. ENHANCE convertLegacyToTemplate():
+   - Extract ALL system prompts from skills.ts getSystemPromptForField()
+   - For each stage.field, add aiPrompt object:
+     * systemPrompt: extracted prompt
+     * userPromptTemplate: buildUserPrompt logic
+     * contextFields: ['projectName', 'objective', 'background']
+     * modeSupport: ['refine', 'auto']
 
-2. Generates output by:
-   - Iterating through template.outputSections
-   - For each section, collecting data from referenced fields
-   - Formatting based on section configuration:
-     * Standard → Concatenate field content
-     * table → Build markdown table
-     * list → Build bullet/numbered list
-     * diagram → Add placeholder/reference
-     * subsections → Handle nested sections
+2. Add diagramConfig to DEFAULT_TEMPLATE:
+   - supportedTypes: ['c4-container', 'sequence', 'deployment', 'component', 'plantuml']
+   - defaultType: 'c4-container'
+   - generationStrategy: 'ai'
+   - maxNodes: 15
+   - layout: 'LR'
+   - fieldExtraction:
+     * components: ['architectureOverview', 'features']
+     * dataStores: ['dataStores']
+     * actors: ['teams']
 
-3. Supports section numbering (1., 1.1, 1.1.1) automatically
-4. Handles empty/missing data gracefully
-5. Adds document header with title, date, template info
-6. Returns structured object: { content: string, metadata: {...} }
+3. Add prompts object:
+   - systemPrompts: Map of all extracted prompts
+   - generationPrompt: Epic generation prompt
+   - diagramPrompt: Diagram AI prompt
+   - critiquePrompt: Critique rules
 
-7. Include formatters:
-   - `formatMarkdownSection(section, data)`
-   - `formatTableSection(section, data)`
-   - `formatListSection(section, data)`
-   - `formatSubsections(section, data)`
+4. Create a 'prompts.json' file with all extracted prompts for review
 
-8. Make it completely generic - no references to 'epic', '17 sections', etc.
-9. Export a singleton: `export const outputGenerator = new DynamicOutputGenerator()`
-
-10. Add JSDoc comments and full TypeScript types.
-
-Provide the complete TypeScript file ready to use."
+Show me the extracted prompts count per stage/field."
 ```
-
-3. **Copy Claude's ENTIRE response** into `DynamicOutputGenerator.ts`
-
-4. **Save the file**
-
-### **Step 1.2: Test Output Generator**
-
-1. **Create test file**:
-   ```bash
-   touch src/templates/DynamicOutputGenerator.test.ts
-   code src/templates/DynamicOutputGenerator.test.ts
-   ```
-
-2. **Paste this EXACT test**:
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { outputGenerator } from './DynamicOutputGenerator';
-import { templateRegistry } from './TemplateRegistry';
-import type { RefinedData } from './schema';
-
-describe('DynamicOutputGenerator', () => {
-  let legacyTemplate: any;
-
-  beforeEach(async () => {
-    legacyTemplate = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    expect(legacyTemplate).toBeDefined();
-  });
-
-  it('should generate markdown output for legacy template', async () => {
-    const mockData: RefinedData = {
-      projectName: {
-        original: 'Test Project',
-        refined: '**Project:** Test Project',
-        diagramNode: 'Project["Test Project"]'
-      },
-      background: {
-        original: 'Test background',
-        refined: '**Background:** Test background explanation',
-        diagramNode: 'Context["Background"]'
-      },
-      objective: {
-        original: 'Build something',
-        refined: '**Objective:** Build something great',
-        diagramNode: 'Objective["Build something"]'
-      },
-      inScope: {
-        original: 'Feature A\nFeature B',
-        refined: '- Feature A\n- Feature B',
-        diagramNode: 'Scope["In Scope"]'
-      }
-    };
-
-    const result = outputGenerator.generate(legacyTemplate!, mockData);
-    
-    expect(result.content).toContain('Technical Epic Generator');
-    expect(result.content).toContain('Test Project');
-    expect(result.content).toContain('1. Objective');
-    expect(result.content).toContain('2. Background & Context');
-    expect(result.content).toContain('3. Scope');
-    
-    console.log('✅ Generated output:', result.content.substring(0, 200) + '...');
-  });
-
-  it('should handle table sections correctly', () => {
-    // Test data for Team & Roles table (section 7)
-    const mockData: RefinedData = {
-      teams: {
-        original: 'Dev Team - Development\nQA Team - Testing',
-        refined: 'Dev Team - Development\nQA Team - Testing',
-        diagramNode: 'Team["Team Structure"]'
-      }
-    };
-
-    const result = outputGenerator.generate(legacyTemplate!, mockData);
-    
-    // Check for table syntax
-    expect(result.content).toContain('| Role | Responsibility |');
-    expect(result.content).toContain('| Dev Team | Development |');
-    
-    console.log('✅ Table formatting works');
-  });
-
-  it('should handle subsections (like Scope with In/Out)', () => {
-    const mockData: RefinedData = {
-      inScope: {
-        original: 'Feature A',
-        refined: '- Feature A',
-        diagramNode: 'Scope["In Scope"]'
-      },
-      outOfScope: {
-        original: 'Feature Z',
-        refined: '- Feature Z',
-        diagramNode: 'OutScope["Out of Scope"]'
-      }
-    };
-
-    const result = outputGenerator.generate(legacyTemplate!, mockData);
-    
-    // Section 3 should have subsections
-    expect(result.content).toContain('### 3.1 In Scope');
-    expect(result.content).toContain('### 3.2 Out of Scope');
-    expect(result.content).toContain('Feature A');
-    expect(result.content).toContain('Feature Z');
-    
-    console.log('✅ Subsections work');
-  });
-
-  it('should handle missing data gracefully', () => {
-    const emptyData: RefinedData = {};
-    
-    const result = outputGenerator.generate(legacyTemplate!, emptyData);
-    
-    // Should still generate document structure
-    expect(result.content).toContain('Technical Epic Generator');
-    // Missing sections should have placeholder or empty content
-    expect(result.content).toContain('1. Objective');
-    
-    console.log('✅ Handles missing data gracefully');
-  });
-
-  it('should generate with metadata', () => {
-    const mockData: RefinedData = {
-      projectName: {
-        original: 'Meta Test',
-        refined: 'Meta Test',
-        diagramNode: ''
-      }
-    };
-
-    const result = outputGenerator.generate(legacyTemplate!, mockData, {
-      includeMetadata: true,
-      format: 'markdown'
-    });
-    
-    expect(result.metadata).toBeDefined();
-    expect(result.metadata.templateId).toBe('legacy-epic-v1');
-    expect(result.metadata.sectionCount).toBeGreaterThan(0);
-    
-    console.log('✅ Metadata generated:', result.metadata);
-  });
-});
-```
-
-3. **Run tests**:
-   ```bash
-   npm test DynamicOutputGenerator
-   ```
-
-4. **Fix errors** by asking Claude if needed.
 
 ---
 
-## **TASK 2: CREATE PROMPT TEMPLATE SYSTEM** (75 minutes)
+## **STEP 2.3: Refactor Skill Runner to be Template-Aware**
 
-### **What this means:**
-Move ALL AI prompts from `skills.ts` into the template JSON. The template will specify exactly what AI should say for each field.
-
-### **Step 2.1: Extract Prompts from skills.ts**
-
-1. **Open skills.ts** to see current prompts:
-   ```bash
-   code src/skills.ts
-   ```
-
-2. **Find the prompt functions** (around line 80, look for `getSystemPromptForField`)
-
-3. **Give Claude this prompt**:
 ```bash
-claude "I need to extract all the hardcoded prompts from src/skills.ts and structure them for our template system.
+# Create new skill runner that uses template prompts
+claude "Create src/skills/index.ts:
 
-Analyze the file and create a complete PromptTemplate structure for each field in the legacy epic template. For each field (projectName, background, objective, inScope, outOfScope, assumptions, architectureOverview, dataStores, features, userStories, nfrs, deliverables, teams, environments, security, dependencies, risks, nextSteps, dod, approvers):
+1. Interface: SkillParams
+   template: EpicTemplate
+   stageId: string
+   fieldId: string
+   userInput: string
+   context: Record<string, string>
+   mode: 'refine' | 'auto'
 
-1. Identify the system prompt (from getSystemPromptForField)
-2. Identify the user prompt pattern (from buildUserPrompt)
-3. Identify any field-specific guidance
-4. Create a PromptConfig object with:
-   - systemPrompt: string
-   - userPromptTemplate: string (with {{variable}} placeholders)
-   - guidance: string (optional)
-   - maxTokens: number (optional)
-   - temperature: number (optional)
+2. Function: async function runTemplateSkill(
+     skill: 'suggest' | 'refine' | 'generate' | 'diagram',
+     params: SkillParams
+   ): Promise<AIResult>
 
-Output as a JavaScript object that can be added to the legacy-epic-template.json file. The structure should be:
+3. Implementation:
+   - Get field from template: const field = template.stages.find(...).fields.find(...)
+   - Get prompt from field.aiPrompt.systemPrompt
+   - Build user prompt from field.aiPrompt.userPromptTemplate + context
+   - Call callAI() with template-specific parameters
+   - Return result
 
-\"prompts\": {
-  \"projectName\": { ... },
-  \"background\": { ... },
-  ...
-}
+4. Function: async function generateEpicFromTemplate(
+     template: EpicTemplate,
+     stageData: Record<string, any>,
+     projectName: string
+   ): Promise<GenerateResult>
 
-Make sure to preserve ALL the nuances of the current prompts, including the 'basePrompt' variable and field-specific instructions."
+   - Iterate template.epicStructure
+   - For each section:
+     * Get template string
+     * Replace {{fieldId}} with stageData[fieldId].refined
+     * Apply formatting based on section.formatting
+   - Call template-aware diagram generation
+   - Return epic + diagram
+
+5. Function: async function getSuggestionFromTemplate(...)
+   - Use field.aiPrompt for prompt building
+   - Respect modeSupport array (disable buttons if not supported)
+
+Include error handling for missing prompts."
 ```
 
-4. **Copy Claude's output** (it should be a big JSON object)
+---
 
-### **Step 2.2: Update Legacy Template with Prompts**
+## **STEP 2.4: Create Dynamic Diagram Generation Service**
 
-1. **Open the legacy template**:
-   ```bash
-   code public/templates/legacy-epic-template.json
-   ```
+```bash
+# Build template-aware diagram service
+claude "Create src/skills/diagrams.ts:
 
-2. **Add the "prompts" section**:
-   - If Claude gave you a top-level "prompts" object, add it to the JSON root
-   - If Claude gave you prompts per-field, add them to each field's `promptConfig`
+1. Function: async function generateTemplateDiagram(
+     template: EpicTemplate,
+     stageData: Record<string, any>,
+     options?: { type?: DiagramType }
+   ): Promise<{ diagram: string; type: DiagramType; reasoning: string }>
 
-3. **The JSON should now look like**:
-```json
-{
-  "id": "legacy-epic-v1",
-  "name": "Technical Epic Generator",
-  "version": "1.0.0",
-  "description": "Original 6-stage to 17-section epic generator",
-  "prompts": {
-    "projectName": {
-      "systemPrompt": "You are an expert technical writer...",
-      "userPromptTemplate": "Generate a project name based on: {{context}}",
-      "maxTokens": 50
-    },
-    "background": { ... }
-  },
-  "stages": [ ... ]
-}
+2. Implementation:
+   - Get diagramConfig from template
+   - Determine diagram type (options.type || config.defaultType)
+   - If config.generationStrategy === 'ai':
+     * Build prompt from template.prompts.diagramPrompt
+     * Include stageData, fieldExtraction config
+     * Call callAI()
+     * Validate and return diagram
+   - If 'rule-based':
+     * Call appropriate generator based on type
+     * Use extracted fields from fieldExtraction config
+   - Return diagram + reasoning
+
+3. Function: extractDiagramFields(
+     stageData: Record<string, any>,
+     extractionConfig: any
+   ): { components: string[]; dataStores: string[]; actors: string[] }
+
+   - Extract components from architectureOverview, features
+   - Extract data stores from dataStores field
+   - Extract actors from teams field
+   - Use regex and parsing logic
+
+4. Keep existing generators:
+   - generateC4ContainerDiagram()
+   - generateSequenceDiagram()
+   - generateDeploymentDiagram()
+   - generateComponentDiagram()
+   - But make them accept extracted fields instead of full data
+
+5. Function: validateMermaidDiagram(diagram: string): boolean
+   - Check for valid start keywords
+   - Check node syntax
+   - Return true/false
+
+Include JSDoc with template diagram prompt example."
 ```
 
-4. **Save the file**
+---
 
-### **Step 2.3: Create PromptRenderer Service**
+## **STEP 2.5: Integrate Critique Agent**
 
-1. **Create the file**:
-   ```bash
-   touch src/templates/PromptRenderer.ts
-   code src/templates/PromptRenderer.ts
-   ```
-
-2. **Give Claude this prompt**:
 ```bash
-claude "Create a PromptRenderer service that:
+# Create Critique Agent service
+claude "Create src/skills/critique.ts:
 
-1. Accepts:
-   - `template: TemplateDefinition`
-   - `fieldName: string`
-   - `context: Record<string, string>`
-   - `mode: 'with-context' | 'auto'`
-   - `userHint?: string`
+1. Class: CritiqueAgent
+   - constructor(template: EpicTemplate)
 
-2. Returns:
-   - `systemPrompt: string`
-   - `userPrompt: string`
+2. Method: async reviewEpicStructure(
+     epicMarkdown: string
+   ): Promise<CritiqueResult>
+
+   - Check all required sections present
+   - Check required fields populated
+   - Validate formatting (tables, checkboxes)
+   - Return array of { severity, message, suggestion }
+
+3. Method: async reviewDiagram(
+     diagram: string,
+     template: EpicTemplate
+   ): Promise<CritiqueResult>
+
+   - Validate diagram type is in supportedTypes
+   - Check node count <= maxNodes
+   - Validate layout matches config
+   - Check for Mermaid syntax errors
+
+4. Method: async reviewFieldContent(
+     fieldId: string,
+     content: string,
+     template: EpicTemplate
+   ): Promise<CritiqueResult>
+
+   - Check minLength if specified
+   - Check for required keywords
+   - Validate structure
+
+5. Interface: CritiqueResult
+   isValid: boolean
+   issues: Array<{
+     severity: 'error' | 'warning' | 'info'
+     message: string
+     suggestion?: string
+     fieldId?: string
+   }>
+   score: number // 0-100
+
+6. Use template.prompts.critiquePrompt for AI review
+
+Include example critique rules from DEFAULT_TEMPLATE."
+```
+
+---
+
+## **STEP 2.6: Create Template Editor UI**
+
+```bash
+# Build UI for editing template prompts and config
+claude "Create src/components/template/TemplateEditor.tsx:
+
+1. Component: TemplateEditor
+   - Props: { template: EpicTemplate, onSave: (template) => void }
+
+2. Tabs:
+   - 'Info': Name, description, version
+   - 'Stages': Reorder/add/delete stages
+   - 'Fields': For each field, edit:
+     * Label, placeholder, required
+     * AI prompt (textarea)
+     * Context fields (multi-select)
+     * Mode support (checkboxes)
+   - 'Sections': Epic structure
+   - 'Diagrams': Diagram config
+     * Supported types (multi-select)
+     * Default type
+     * Layout
+     * Max nodes
+   - 'Critique': Critique rules
+
+3. Use react-hook-form for validation
+
+4. Code editor for prompts (Monaco editor if available)
+
+5. Preview tab: See how template renders
+
+6. Save button: Validates and calls onSave
+
+Include JSON export/import within editor."
+```
+
+---
+
+## **STEP 2.7: Update App.tsx with Critique Integration**
+
+```bash
+# Add critique to epic generation flow
+claude "Modify src/App.tsx:
+
+1. Import CritiqueAgent
+
+2. After generateEpicFromTemplate() in handleGenerateEpic:
+   - const critique = new CritiqueAgent(activeTemplate)
+   - const review = await critique.reviewEpicStructure(updatedEpic)
+   - If review.issues.length > 0:
+     * Show toast: 'Epic generated with {n} suggestions'
+     * Add button: 'View Critique'
+     * Open critique panel
+
+3. Add critique panel UI:
+   - Shows issues by severity
+   - One-click fix suggestions
+   - Apply to epic button
+
+4. After diagram generation:
+   - const diagramReview = await critique.reviewDiagram(blueprintCode, activeTemplate)
+   - If invalid, show warning toast
+
+5. Track critique metrics over time
+
+This adds quality gate to generation."
+```
+
+---
+
+## **STEP 2.8: Remove Legacy Constants (CAREFULLY)**
+
+```bash
+# Remove hardcoded STAGES and EPIC_SECTIONS
+claude "Modify src/types/types.ts:
+
+1. REMOVE:
+   - STAGES array
+   - EPIC_SECTIONS array
+   - getSystemPromptForField function
+   - buildUserPrompt function
+
+2. KEEP (but mark deprecated):
+   - LegacyStage interface
+   - LegacyEpicSection interface
+   - Comment: // @deprecated - Removed in Phase 2, use EpicTemplate
+
+3. Update any remaining imports in other files:
+   - Find all references to STAGES/EPIC_SECTIONS
+   - Replace with useTemplate() hook
+   - Run TypeScript compiler to catch errors
+
+This is BREAKING - ensure all files updated first."
+```
+
+---
+
+## **STEP 2.9: Update Skills.ts to Remove Hardcoded Logic**
+
+```bash
+# Remove old functions, keep only template-aware ones
+claude "Refactor src/skills.ts:
+
+KEEP:
+- setConfig()
+- callAI() (but mark as internal)
+- generateIntelligentBlueprint() (refactor to use template)
+- fixMermaidDiagram()
+
+REMOVE:
+- getSystemPromptForField() (moved to template)
+- buildUserPrompt() (moved to template)
+- runSkill() (replaced by runTemplateSkill)
+- refineInput() (replaced by template logic)
+- generateEpic() (replaced by generateEpicFromTemplate)
+
+MODIFY:
+- generateIntelligentBlueprint(): Accept template param
+- All diagram generators: Accept extracted fields param
+
+Add deprecation notices and point to new functions."
+```
+
+---
+
+## **STEP 2.10: Create Template Gallery UI**
+
+```bash
+# Create UI for browsing and selecting templates
+claude "Create src/components/template/TemplateGallery.tsx:
+
+1. Component: TemplateGallery
+   - Shows all registered templates
+   - Grid layout with cards
+
+2. Each template card shows:
+   - Name and description
+   - Stage count
+   - Section count
+   - GitLab icon if sourced from GitLab
+   - 'Use Template' button
 
 3. Features:
-   - Load prompt template from template.prompts[fieldName]
-   - Replace {{variable}} placeholders with actual values from context
-   - Support built-in variables: {{fieldName}}, {{fieldLabel}}, {{context}}, {{userHint}}
-   - Fall back to generic prompt if no template found
-   - Include context data (projectName, objective, etc.) in user prompt
-   - Handle 'with-context' vs 'auto' modes appropriately
+   - Search/filter by name/category
+   - Sort by name, last used
+   - Preview template (opens TemplateEditor in read-only)
+   - Import from GitLab (opens EpicSelector)
 
-4. Methods:
-   - `renderSystemPrompt(template, fieldName, fieldConfig)`
-   - `renderUserPrompt(template, fieldName, context, mode, userHint)`
-   - `buildContextString(context)` - extracts relevant context fields
+4. Use useTemplate() to get list and switch
 
-5. Export singleton: `export const promptRenderer = new PromptRenderer()`
-
-6. Include full TypeScript types and JSDoc
-
-Provide complete, ready-to-use TypeScript file."
-```
-
-3. **Copy Claude's response** into `PromptRenderer.ts`
-
-4. **Save the file**
-
-### **Step 2.4: Refactor skills.ts to Use PromptRenderer**
-
-1. **Open skills.ts**:
-   ```bash
-   code src/skills.ts
-   ```
-
-2. **Find the `getSuggestion` function** (around line 45)
-
-3. **Replace the ENTIRE `getSuggestion` function** with this:
-```typescript
-export async function getSuggestion(
-  templateId: string,
-  fieldName: string,
-  context: Record<string, string>,
-  mode: 'with-context' | 'auto' = 'auto'
-): Promise<SuggestionResult> {
-  if (!currentConfig) {
-    throw new Error('Azure OpenAI is not configured. Please check Settings.');
-  }
-
-  // Load template to get prompt configuration
-  const template = await templateRegistry.getTemplate(templateId);
-  if (!template) {
-    throw new Error(`Template ${templateId} not found`);
-  }
-
-  // Use the prompt renderer
-  const userHint = context['_userHint'];
-  const { systemPrompt, userPrompt } = promptRenderer.renderPrompts(
-    template,
-    fieldName,
-    context,
-    mode,
-    userHint
-  );
-
-  const aiResponse = await callAI(currentConfig, systemPrompt, userPrompt);
-
-  return {
-    suggestion: aiResponse.trim(),
-    alternatives: [],
-  };
-}
-```
-
-4. **Remove the old prompt functions** (delete these):
-   - Delete `getSystemPromptForField` function
-   - Delete `buildUserPrompt` function
-   - Delete `fieldPrompts` object
-   - Delete `fieldGuidance` object
-
-5. **Add imports at top of skills.ts**:
-```typescript
-import { templateRegistry } from './templates/TemplateRegistry';
-import { promptRenderer } from './templates/PromptRenderer';
-```
-
-6. **Save skills.ts**
-
-### **Step 2.5: Test Prompt System**
-
-1. **Create test file**:
-   ```bash
-   touch src/templates/PromptRenderer.test.ts
-   code src/templates/PromptRenderer.test.ts
-   ```
-
-2. **Paste this test**:
-```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { promptRenderer } from './PromptRenderer';
-import { templateRegistry } from './TemplateRegistry';
-
-describe('PromptRenderer', () => {
-  let legacyTemplate: any;
-
-  beforeEach(async () => {
-    legacyTemplate = await templateRegistry.loadTemplate('legacy-epic-v1', 'file');
-    expect(legacyTemplate).toBeDefined();
-  });
-
-  it('should render system prompt for projectName field', () => {
-    const result = promptRenderer.renderSystemPrompt(
-      legacyTemplate!,
-      'projectName'
-    );
-    
-    expect(result).toContain('expert technical writer');
-    expect(result).toContain('project name');
-    console.log('✅ System prompt rendered:', result.substring(0, 100) + '...');
-  });
-
-  it('should render user prompt with context', () => {
-    const context = {
-      projectName: 'Test Project',
-      objective: 'Build something'
-    };
-    
-    const result = promptRenderer.renderUserPrompt(
-      legacyTemplate!,
-      'background',
-      context,
-      'auto'
-    );
-    
-    expect(result).toContain('Project: Test Project');
-    expect(result).toContain('Objective: Build something');
-    console.log('✅ User prompt with context rendered');
-  });
-
-  it('should substitute {{placeholders}}', () => {
-    // Create a test template with placeholders
-    const testTemplate = {
-      ...legacyTemplate!,
-      prompts: {
-        testField: {
-          systemPrompt: 'System prompt for {{fieldName}}',
-          userPromptTemplate: 'Help with {{fieldLabel}} in project {{projectName}}'
-        }
-      }
-    };
-    
-    const result = promptRenderer.renderPrompts(
-      testTemplate,
-      'testField',
-      { projectName: 'MyProject' },
-      'auto'
-    );
-    
-    expect(result.systemPrompt).toBe('System prompt for testField');
-    expect(result.userPrompt).toContain('Help with testField');
-    expect(result.userPrompt).toContain('MyProject');
-    console.log('✅ Placeholder substitution works');
-  });
-});
-```
-
-3. **Run tests**:
-   ```bash
-   npm test PromptRenderer
-   ```
-
----
-
-## **TASK 3: INTEGRATE DYNAMIC OUTPUT INTO APP** (45 minutes)
-
-### **Step 3.1: Update App.tsx generateEpic Function**
-
-1. **Open App.tsx** again:
-   ```bash
-   code src/App.tsx
-   ```
-
-2. **Replace the `generateEpic` function** with this fully dynamic version:
-```typescript
-const generateEpic = async () => {
-  if (!templateModel || !currentTemplateId) return;
-
-  setIsGenerating(true);
-  
-  try {
-    // Get template definition
-    const template = await templateRegistry.getTemplate(currentTemplateId);
-    if (!template) throw new Error('Template not found');
-
-    // Get refined data from model
-    const refinedData = templateModel.getRefinedData();
-
-    // Use dynamic output generator
-    const result = outputGenerator.generate(
-      template,
-      refinedData,
-      {
-        format: 'markdown',
-        includeMetadata: true
-      }
-    );
-
-    // Update state
-    setEditableEpic(result.content);
-    setState(prev => ({ ...prev, generatedEpic: result.content }));
-    
-    // Generate blueprint (we'll make this dynamic next phase)
-    const projectName = templateModel.getFieldValue('projectName') || 'Untitled';
-    setBlueprintCode(`graph TD\n    A[${projectName}]\n    B[Generated from ${template.name}]\n    A --> B`);
-    
-    // Switch tabs
-    setActiveTab('epic');
-    triggerConfetti();
-    showToast('success', 'Generated!', `Created using ${template.name}`);
-    
-  } catch (error) {
-    console.error('Generation failed:', error);
-    showToast('error', 'Failed', error.message);
-  } finally {
-    setIsGenerating(false);
-  }
-};
-```
-
-3. **Add imports** to App.tsx:
-```typescript
-import { outputGenerator } from './templates/DynamicOutputGenerator';
-```
-
-4. **Save App.tsx**
-
-### **Step 3.2: Update Skills Integration**
-
-1. **In App.tsx**, find the `handleGetSuggestion` function
-
-2. **Replace it** with this version:
-```typescript
-const handleGetSuggestion = async (fieldName: string, mode: 'with-context' | 'auto') => {
-  if (!templateModel || !config.azureOpenAI.enabled) return;
-
-  const context = templateModel.getAllFieldValues();
-  const userHint = context[fieldName]; // Current field value as hint
-
-  setLoadingSuggestion(prev => ({ ...prev, [fieldName]: true }));
-
-  try {
-    const result = await getSuggestion(
-      currentTemplateId, // Use current template ID
-      fieldName,
-      { ...context, _userHint: mode === 'with-context' ? userHint : undefined },
-      mode
-    );
-
-    // Use typewriter effect to display suggestion
-    typewriterEffect(fieldName, result.suggestion);
-  } catch (error) {
-    console.error('Suggestion failed:', error);
-    showToast('error', 'Suggestion Failed', error.message);
-  } finally {
-    setLoadingSuggestion(prev => ({ ...prev, [fieldName]: false }));
-  }
-};
-```
-
-3. **Remove unused imports** from App.tsx:
-```typescript
-// Remove this line:
-import { STAGES, EPIC_SECTIONS, type EpicState, type ChatMessage, type ChatState } from './types';
+Include empty state: 'No templates yet. Import from GitLab or create new.'"
 ```
 
 ---
 
-## **TASK 4: CREATE TEMPLATE BUILDER UI** (90 minutes)
+## **STEP 2.11: Update Migration to Include All AI Logic**
 
-### **What this means:**
-Build a simple interface where you can create new templates visually. This proves the system is truly dynamic.
-
-### **Step 4.1: Create TemplateBuilder Component**
-
-1. **Create component file**:
-   ```bash
-   touch src/templates/TemplateBuilder.tsx
-   code src/templates/TemplateBuilder.tsx
-   ```
-
-2. **Give Claude this prompt**:
 ```bash
-claude "Create a TemplateBuilder React component that lets users create templates visually. It should have:
+# Ensure migration extracts everything
+claude "Verify src/utils/templates/migrations.ts:
 
-1. Three-panel layout:
-   - Left: Stage list (add/edit/delete stages)
-   - Center: Field editor for selected stage (add/edit/delete fields)
-   - Right: Output section mapper (link fields to output sections)
+Double-check that convertLegacyToTemplate() extracts:
 
-2. Features:
-   - Form to edit template metadata (name, description, version)
-   - 'Add Stage' button → opens stage editor modal
-   - 'Add Field' button → opens field editor modal
-   - Drag-and-drop to reorder stages
-   - Visual mapper: drag fields from center to right panel to create output sections
-   - JSON preview tab (live preview of template JSON)
-   - 'Test Template' button (runs wizard with current template)
-   - 'Save Template' (stores in localStorage)
+1. ALL system prompts from skills.ts (should be ~30 prompts)
+2. Generation prompt from generateEpic()
+3. Diagram prompts from generateIntelligentBlueprint()
+4. Critique rules (create default set)
+5. Field-specific context fields
+6. Mode support for each field
 
-3. Use existing App.tsx styles (reuse the same style objects)
-4. Be fully typed with TypeScript interfaces
-5. Manage all state internally with useState
+Add any missing prompts. Create MIGRATION_SUMMARY object:
+export const MIGRATION_SUMMARY = {
+  promptsExtracted: 32,
+  stagesConverted: 6,
+  sectionsConverted: 17,
+  diagramConfigs: 5
+};
 
-Provide the complete TSX file with all functionality. This doesn't need to be perfect - just functional for creating simple templates."
-```
-
-3. **Copy Claude's response** into `TemplateBuilder.tsx`
-
-4. **Save the file**
-
-### **Step 4.2: Add Template Builder Tab to App**
-
-1. **Open App.tsx**
-
-2. **Add to the tabs section** (find `const renderSettings = ()` and add before it):
-```typescript
-const renderTemplateBuilder = () => (
-  <div>
-    <div style={styles.stageTitle}>Template Builder</div>
-    <div style={{ color: '#6b7280', marginBottom: '20px' }}>
-      Create and edit templates visually. Changes are saved to localStorage.
-    </div>
-    {/* We'll import and use the TemplateBuilder component */}
-    {/* For now, show placeholder */}
-    <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-      Template Builder UI will appear here
-    </div>
-  </div>
-);
-```
-
-3. **Add to tabs** (find the tabs JSX):
-```tsx
-<button style={styles.tab(activeTab === 'templates')} onClick={() => setActiveTab('templates')}>
-  <LayoutDashboard size={16} strokeWidth={1.5} style={styles.tabIcon} />
-  Templates
-</button>
-```
-
-4. **Update tab rendering** (find `activeTab === 'settings' ? renderSettings()` and add):
-```tsx
-{activeTab === 'templates' ? renderTemplateBuilder() : 
- activeTab === 'settings' ? renderSettings() : 
- renderEpicEditor()}
+Add console.log on import to show migration stats."
 ```
 
 ---
 
-## **PHASE 2 COMPLETION CHECKLIST**
+## **STEP 2.12: Create Comprehensive Tests for Skills**
 
-### **✅ Files Created:**
 ```bash
-# Verify:
-ls src/templates/
+# Test all new skill functions
+claude "Create src/skills/__tests__/skills.test.ts:
+
+Test suites:
+
+1. 'runTemplateSkill'
+   - Uses template prompts correctly
+   - Respects modeSupport
+   - Builds context from contextFields
+   - Returns structured result
+
+2. 'generateEpicFromTemplate'
+   - Renders all sections from template
+   - Applies correct formatting
+   - Calls diagram generation
+   - Returns epic + diagram
+
+3. 'generateTemplateDiagram'
+   - Uses AI strategy when configured
+   - Uses rule-based when configured
+   - Extracts fields correctly
+   - Returns valid diagram
+
+4. 'CritiqueAgent'
+   - Reviews epic structure
+   - Reviews diagram
+   - Returns valid CritiqueResult
+   - Score calculation
+
+5. 'extractDiagramFields'
+   - Parses architectureOverview
+   - Parses dataStores
+   - Parses teams
+   - Returns structured data
+
+Use jest mocks for callAI(). Include fixture templates."
 ```
-- `DynamicOutputGenerator.ts` (+ .test.ts)
-- `PromptRenderer.ts` (+ .test.ts)
-- `TemplateBuilder.tsx` (optional but good to have)
-
-### **✅ Functionality Verified:**
-- [ ] Run `npm test` - all new tests pass
-- [ ] Run `npm run dev` - app loads
-- [ ] Go through wizard → generate document → output appears in Epic Editor
-- [ ] Output structure matches template (17 sections for legacy)
-- [ ] Prompts are loaded from template (test by editing template JSON and reloading)
-- [ ] Can switch templates (try meeting-notes template)
-
-### **✅ Code Quality:**
-- [ ] No TypeScript errors: `npx tsc --noEmit`
-- [ ] No console errors in browser
-- [ ] App behavior identical to Phase 1 (backward compatible)
-
-### **✅ Template JSON Updated:**
-- [ ] `public/templates/legacy-epic-template.json` includes `prompts` section
-- [ ] Prompts extracted from skills.ts
-- [ ] Template schema validates
 
 ---
 
-## **TESTING THE DYNAMIC SYSTEM**
+## **STEP 2.13: Commit Phase 2**
 
-### **Test 1: Legacy Template Still Works**
-1. Make sure `currentTemplateId` is `'legacy-epic-v1'`
-2. Run through wizard
-3. Generate document
-4. **Verify**: Should have 17 sections
+```bash
+# Commit the AI parameterization
+claude "Execute:
+git add -A
+git commit -m 'feat: Phase 2 - AI Skills Parameterization & Dynamic Diagrams
 
-### **Test 2: Meeting Notes Template**
-1. Change `currentTemplateId` to `'meeting-notes-v1'`
-2. Reload browser
-3. **Verify**: Should have only 3 stages
-4. Fill in data and generate
-5. **Verify**: Output has 4 sections (Summary, Participants, Notes, Action Items)
+Transform hardcoded AI into template-driven system:
 
-### **Test 3: Edit Prompt in Template**
-1. Open `legacy-epic-template.json`
-2. Change the `projectName` prompt to something silly: "Generate a ridiculous project name"
-3. Save file
-4. Reload browser
-5. Click "Auto" on Project Name field
-6. **Verify**: AI should use the new prompt (may take more than one try due to caching)
+- Template schema enhanced with aiPrompt and diagramConfig
+- All AI prompts migrated from skills.ts to DEFAULT_TEMPLATE
+- runTemplateSkill() - template-aware skill runner
+- generateTemplateDiagram() - dynamic diagram generation
+- CritiqueAgent - validates templates and output
+- TemplateEditor UI for managing prompts and config
+- TemplateGallery for browsing templates
+- Legacy constants (STAGES/EPIC_SECTIONS) removed
+- Skills.ts refactored to pure template functions
+
+BREAKING CHANGE: STAGES and EPIC_SECTIONS removed from types.ts
+All AI logic now requires EpicTemplate context
+Closes: phase2-ai-parameterization'
+"
+```
 
 ---
 
-## **WHAT YOU'VE ACCOMPLISHED**
+## **PHASE 2 DELIVERABLES**
 
-**Phase 2 Complete!** You now have:
-1. ✅ **Dynamic output generation** - works with any template
-2. ✅ **Prompt system** - AI behavior controlled by templates
-3. ✅ **Refactored skills.ts** - no more hardcoded prompts
-4. ✅ **Template builder UI** (started) - visual template creation
-5. ✅ **Fully dynamic system** - prompt + structure + output all template-driven
+✅ **Template AI Config**: Every field has aiPrompt object  
+✅ **Dynamic Skills**: All logic reads from template.prompts  
+✅ **Dynamic Diagrams**: Template specifies type, prompts, layout  
+✅ **Critique Agent**: Validates structure, diagram, content  
+✅ **Template Editor**: UI to edit prompts, diagram config, critique rules  
+✅ **Template Gallery**: Browse and select templates  
+✅ **Legacy Removal**: STAGES/EPIC_SECTIONS deleted  
+✅ **Refactored Skills**: No hardcoded logic, pure functions  
+✅ **Tests**: Comprehensive skill and agent tests  
 
-**Your templates are now in control of EVERYTHING.**
+---
+
+## **WHAT CHANGES IN USAGE**
+
+### **Before Phase 2:**
+```typescript
+// Hardcoded prompt
+const prompt = getSystemPromptForField('project', 'background');
+```
+
+### **After Phase 2:**
+```typescript
+// Template-driven
+const field = template.stages[0].fields[1];
+const prompt = field.aiPrompt?.systemPrompt;
+```
+
+### **Before Phase 2:**
+```typescript
+// Fixed diagram type
+const diagram = generateC4ContainerDiagram(data);
+```
+
+### **After Phase 2:**
+```typescript
+// Template-driven
+const { diagram, type } = await generateTemplateDiagram(template, stageData);
+```
 
 ---
 
 ## **READY FOR PHASE 3?**
 
-Phase 3 will add:
-- Template Gallery (browse templates)
-- Template validation and versioning
-- Advanced features (conditional sections, dynamic diagrams)
-- Template import/export
+**Phase 3** will focus on:
+1. **Advanced Template Features**: Conditional fields, field dependencies, dynamic sections
+2. **Template Marketplace**: Share templates via GitLab
+3. **Analytics**: Track template usage, AI suggestion quality
+4. **Performance**: Optimize large templates, lazy loading
+5. **Collaboration**: Multi-user template editing
 
-**Say "Proceed to Phase 3" to continue!**
+**Proceed with Phase 3?**
