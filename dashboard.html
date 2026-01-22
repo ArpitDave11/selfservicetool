@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRAME - Personal Financial Assistant</title>
+  <link rel="icon" type="image/png" href="public/UBS-3821101260.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* === CSS Reset === */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* === CSS Variables === */
+    :root {
+      /* Colors */
+      --color-bg: #FDF6F4;
+      --color-card: #FFFFFF;
+      --color-primary: #E60000;
+      --color-primary-light: #FEF2F2;
+      --color-primary-hover: #CC0000;
+      --color-text: #1A1A1A;
+      --color-text-secondary: #6B7280;
+      --color-text-muted: #9CA3AF;
+      --color-border: #F3F4F6;
+      --color-success: #10B981;
+      --color-danger: #EF4444;
+
+      /* Donut Chart Colors */
+      --chart-1: #8B2942;
+      --chart-2: #C45C5C;
+      --chart-3: #E88B8B;
+      --chart-4: #F5A3A3;
+      --chart-5: #FBBFBF;
+      --chart-6: #FCD5D5;
+      --chart-7: #FEE8E8;
+
+      /* Spacing */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+
+      /* Border Radius */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --radius-full: 9999px;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+      /* Sidebar */
+      --sidebar-width: 220px;
+      --sidebar-collapsed: 72px;
+
+      /* Transitions */
+      --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* === Base Styles === */
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* === App Layout === */
+    .app {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* === Sidebar === */
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      width: var(--sidebar-width);
+      background: var(--color-card);
+      border-right: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      transition: width var(--transition);
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    .sidebar.collapsed {
+      width: var(--sidebar-collapsed);
+    }
+
+    .sidebar__header {
+      padding: var(--space-5);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      border-bottom: 1px solid var(--color-border);
+      min-height: 72px;
+    }
+
+    .sidebar__logo {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .sidebar__brand {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-primary);
+      white-space: nowrap;
+      opacity: 1;
+      transition: opacity var(--transition);
+    }
+
+    .sidebar.collapsed .sidebar__brand {
+      opacity: 0;
+      width: 0;
+    }
+
+    .sidebar__nav {
+      flex: 1;
+      padding: var(--space-4) var(--space-3);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-md);
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all var(--transition);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .nav-item:hover {
+      background: var(--color-border);
+      color: var(--color-text);
+    }
+
+    .nav-item.active {
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+    }
+
+    .nav-item.active .nav-icon {
+      color: var(--color-primary);
+    }
+
+    .nav-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .nav-label {
+      opacity: 1;
+      transition: opacity var(--transition);
+    }
+
+    .sidebar.collapsed .nav-label {
+      opacity: 0;
+    }
+
+    .nav-item.has-badge {
+      justify-content: space-between;
+    }
+
+    .nav-badge {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      transition: opacity var(--transition);
+    }
+
+    .sidebar.collapsed .nav-badge {
+      opacity: 0;
+    }
+
+    .sidebar__footer {
+      padding: var(--space-4);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .sidebar__toggle {
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--color-border);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text-secondary);
+      transition: all var(--transition);
+    }
+
+    .sidebar__toggle:hover {
+      background: var(--color-text-secondary);
+      color: white;
+    }
+
+    .sidebar__toggle svg {
+      transition: transform var(--transition);
+    }
+
+    .sidebar.collapsed .sidebar__toggle svg {
+      transform: rotate(180deg);
+    }
+
+    /* === Main Content === */
+    .main {
+      flex: 1;
+      margin-left: var(--sidebar-width);
+      padding: var(--space-6);
+      transition: margin-left var(--transition);
+    }
+
+    .sidebar.collapsed ~ .main {
+      margin-left: var(--sidebar-collapsed);
+    }
+
+    /* === Header === */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: var(--space-6);
+    }
+
+    .header__left {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .header__status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--color-success);
+      border-radius: var(--radius-full);
+    }
+
+    .header__title {
+      font-size: 28px;
+      font-weight: 400;
+      color: var(--color-text);
+    }
+
+    .header__title span {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    .header__greeting {
+      font-size: 18px;
+      color: var(--color-text);
+      margin-top: var(--space-2);
+    }
+
+    .header__greeting strong {
+      font-weight: 600;
+    }
+
+    .notification-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .notification-badge svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* === Dashboard Grid === */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: var(--space-6);
+    }
+
+    .dashboard-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+
+    /* === Card Styles === */
+    .card {
+      background: var(--color-card);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card__title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--space-4);
+    }
+
+    /* === Account/Card Row === */
+    .account-row, .card-row {
+      display: flex;
+      align-items: center;
+      padding: var(--space-4);
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-3);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .account-row:hover, .card-row:hover {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow-md);
+    }
+
+    .account-row:last-child, .card-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .account-icon, .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: var(--space-4);
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .account-icon.blue { background: #3B82F6; }
+    .account-icon.purple { background: #8B5CF6; }
+    .card-icon.gold { background: linear-gradient(135deg, #D4A574, #C49B6A); }
+    .card-icon.silver { background: linear-gradient(135deg, #94A3B8, #64748B); }
+    .card-icon.dark { background: linear-gradient(135deg, #374151, #1F2937); }
+
+    .account-info, .card-info {
+      flex: 1;
+    }
+
+    .account-number, .card-number {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .account-balance, .card-balance {
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    .account-balance span, .card-balance span {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .row-arrow {
+      color: var(--color-text-muted);
+    }
+
+    /* === Add Card Button === */
+    .add-card-btn {
+      width: 100%;
+      padding: var(--space-4);
+      background: transparent;
+      border: 2px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      color: var(--color-text-muted);
+      font-size: 20px;
+      cursor: pointer;
+      transition: all var(--transition);
+      margin-top: var(--space-3);
+    }
+
+    .add-card-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    /* === Quick Actions === */
+    .quick-actions {
+      margin-top: var(--space-6);
+    }
+
+    .quick-action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: var(--space-4) var(--space-5);
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-text);
+      cursor: pointer;
+      transition: all var(--transition);
+      margin-bottom: var(--space-3);
+    }
+
+    .quick-action-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .quick-action-btn:last-child {
+      margin-bottom: 0;
+    }
+
+    /* === Spending Analysis === */
+    .spending-card {
+      display: flex;
+      gap: var(--space-6);
+    }
+
+    .donut-container {
+      position: relative;
+      width: 180px;
+      height: 180px;
+      flex-shrink: 0;
+    }
+
+    .donut-chart {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .donut-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+
+    .donut-amount {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .donut-amount small {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .donut-label {
+      font-size: 11px;
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+
+    .spending-legend {
+      flex: 1;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      font-size: 13px;
+    }
+
+    .legend-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: var(--radius-full);
+    }
+
+    .legend-name {
+      color: var(--color-text);
+    }
+
+    .legend-amount {
+      color: var(--color-text-muted);
+      font-weight: 500;
+    }
+
+    .spending-insight {
+      margin-top: var(--space-4);
+      padding: var(--space-4);
+      background: var(--color-bg);
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    /* === Recent Transactions === */
+    .transactions-card {
+      margin-top: var(--space-6);
+    }
+
+    .transaction-row {
+      display: flex;
+      align-items: center;
+      padding: var(--space-4) 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .transaction-row:last-child {
+      border-bottom: none;
+    }
+
+    .transaction-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--color-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: var(--space-4);
+      font-size: 18px;
+    }
+
+    .transaction-info {
+      flex: 1;
+    }
+
+    .transaction-date {
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+
+    .transaction-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .transaction-meta {
+      text-align: right;
+    }
+
+    .transaction-time {
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+
+    .transaction-amount {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .transaction-amount.negative {
+      color: var(--color-danger);
+    }
+
+    .transaction-amount.positive {
+      color: var(--color-success);
+    }
+
+    .transaction-amount svg {
+      width: 12px;
+      height: 12px;
+      vertical-align: middle;
+      margin-right: 2px;
+    }
+
+    /* === Footer Text === */
+    .footer-text {
+      margin-top: var(--space-8);
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+
+    /* === Responsive === */
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        width: var(--sidebar-collapsed);
+      }
+
+      .sidebar .sidebar__brand,
+      .sidebar .nav-label,
+      .sidebar .nav-badge {
+        display: none;
+      }
+
+      .main {
+        margin-left: var(--sidebar-collapsed);
+      }
+
+      .header {
+        flex-direction: column;
+        gap: var(--space-4);
+      }
+
+      .header__title {
+        font-size: 22px;
+      }
+
+      .spending-card {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__header">
+        <img src="public/UBS-3821101260.png" alt="UBS Logo" class="sidebar__logo">
+        <span class="sidebar__brand">FRAME</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <a href="#" class="nav-item active">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+          </svg>
+          <span class="nav-label">Assistant</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="2"/>
+            <path d="M2 10h20"/>
+          </svg>
+          <span class="nav-label">Accounts</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="2"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+          <span class="nav-label">Cards</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          <span class="nav-label">Expenses</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+          </svg>
+          <span class="nav-label">Payments</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v2m0 18v2m11-11h-2M3 12H1m17.07-7.07l-1.41 1.41M7.34 16.66l-1.41 1.41m12.02 0l-1.41-1.41M7.34 7.34L5.93 5.93"/>
+          </svg>
+          <span class="nav-label">Settings</span>
+        </a>
+        <a href="#" class="nav-item has-badge">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+          <span class="nav-label">Twint</span>
+          <span class="nav-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M7 17l9.2-9.2M17 17V7H7"/>
+            </svg>
+          </span>
+        </a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <button class="sidebar__toggle" onclick="toggleSidebar()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Header -->
+      <header class="header">
+        <div class="header__left">
+          <div class="header__status">
+            <span class="status-dot"></span>
+            Connected to a secure channel.
+          </div>
+          <h1 class="header__title">Personal <span>financial assistant</span></h1>
+          <p class="header__greeting">Hello <strong>Jeremy</strong></p>
+        </div>
+        <div class="notification-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 8v4m0 4h.01"/>
+          </svg>
+          You have 2 pending bills
+        </div>
+      </header>
+
+      <!-- Dashboard Grid -->
+      <div class="dashboard-grid">
+        <!-- Left Column -->
+        <div class="dashboard-col">
+          <!-- Accounts Card -->
+          <div class="card">
+            <h3 class="card__title">Accounts</h3>
+            <div class="account-row">
+              <div class="account-icon blue">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                </svg>
+              </div>
+              <div class="account-info">
+                <div class="account-number">740B</div>
+                <div class="account-balance">CHF <span>56.01</span></div>
+              </div>
+              <svg class="row-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </div>
+            <div class="account-row">
+              <div class="account-icon purple">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                </svg>
+              </div>
+              <div class="account-info">
+                <div class="account-number">7M1N</div>
+                <div class="account-balance">CHF <span>4'008.69</span></div>
+              </div>
+              <svg class="row-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Cards Section -->
+          <div class="card">
+            <h3 class="card__title">Cards</h3>
+            <div class="card-row">
+              <div class="card-icon gold">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                </svg>
+              </div>
+              <div class="card-info">
+                <div class="card-number">4340</div>
+                <div class="card-balance">CHF <span>172.60</span></div>
+              </div>
+            </div>
+            <div class="card-row">
+              <div class="card-icon silver">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                </svg>
+              </div>
+              <div class="card-info">
+                <div class="card-number">3650</div>
+                <div class="card-balance">CHF <span>50.48</span></div>
+              </div>
+            </div>
+            <div class="card-row">
+              <div class="card-icon dark">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                </svg>
+              </div>
+              <div class="card-info">
+                <div class="card-number">2564</div>
+                <div class="card-balance">CHF <span>74.20</span></div>
+              </div>
+            </div>
+            <button class="add-card-btn">+</button>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="quick-actions">
+            <h3 class="card__title">Quick actions</h3>
+            <button class="quick-action-btn">
+              Payment to card
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
+            <button class="quick-action-btn">
+              Send money
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dashboard-col">
+          <!-- Spending Analysis -->
+          <div class="card">
+            <h3 class="card__title">Spending analysis</h3>
+            <div class="spending-card">
+              <div class="donut-container">
+                <svg class="donut-chart" viewBox="0 0 100 100">
+                  <!-- Background circle -->
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#F3F4F6" stroke-width="12"/>
+                  <!-- Segments (calculated for the spending categories) -->
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#8B2942" stroke-width="12"
+                    stroke-dasharray="30 220" stroke-dashoffset="0"/>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#C45C5C" stroke-width="12"
+                    stroke-dasharray="25 225" stroke-dashoffset="-30"/>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#E88B8B" stroke-width="12"
+                    stroke-dasharray="24 226" stroke-dashoffset="-55"/>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#F5A3A3" stroke-width="12"
+                    stroke-dasharray="23 227" stroke-dashoffset="-79"/>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#FBBFBF" stroke-width="12"
+                    stroke-dasharray="7 243" stroke-dashoffset="-102"/>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#FCD5D5" stroke-width="12"
+                    stroke-dasharray="7 243" stroke-dashoffset="-109"/>
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#FEE8E8" stroke-width="12"
+                    stroke-dasharray="4 246" stroke-dashoffset="-116"/>
+                </svg>
+                <div class="donut-center">
+                  <div class="donut-amount"><small>CHF</small> 901.24</div>
+                  <div class="donut-label">Your personal expenses<br>in health in are up 24%<br>from last month.</div>
+                </div>
+              </div>
+              <div class="spending-legend">
+                <div class="legend-item">
+                  <div class="legend-left">
+                    <span class="legend-dot" style="background: #8B2942"></span>
+                    <span class="legend-name">Household</span>
+                  </div>
+                  <span class="legend-amount">CHF 108.52</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-left">
+                    <span class="legend-dot" style="background: #C45C5C"></span>
+                    <span class="legend-name">Personal</span>
+                  </div>
+                  <span class="legend-amount">CHF 90.24</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-left">
+                    <span class="legend-dot" style="background: #E88B8B"></span>
+                    <span class="legend-name">Health</span>
+                  </div>
+                  <span class="legend-amount">CHF 85.45</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-left">
+                    <span class="legend-dot" style="background: #F5A3A3"></span>
+                    <span class="legend-name">Transport</span>
+                  </div>
+                  <span class="legend-amount">CHF 84.27</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-left">
+                    <span class="legend-dot" style="background: #FBBFBF"></span>
+                    <span class="legend-name">Media</span>
+                  </div>
+                  <span class="legend-amount">CHF 25.98</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-left">
+                    <span class="legend-dot" style="background: #FCD5D5"></span>
+                    <span class="legend-name">Hobby</span>
+                  </div>
+                  <span class="legend-amount">CHF 24.69</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-left">
+                    <span class="legend-dot" style="background: #FEE8E8"></span>
+                    <span class="legend-name">Other</span>
+                  </div>
+                  <span class="legend-amount">CHF 12.75</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div class="card transactions-card">
+            <h3 class="card__title">Recent transactions</h3>
+            <div class="transaction-row">
+              <div class="transaction-icon">🌐</div>
+              <div class="transaction-info">
+                <div class="transaction-date">October 22, 2019 20:36</div>
+                <div class="transaction-name">
+                  <span style="width: 8px; height: 8px; background: #3B82F6; border-radius: 50%; display: inline-block;"></span>
+                  GALAXUS.CH
+                </div>
+              </div>
+              <div class="transaction-meta">
+                <div class="transaction-time">20 minutes ago</div>
+                <div class="transaction-amount negative">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                  </svg>
+                  CHF 50.99
+                </div>
+              </div>
+            </div>
+            <div class="transaction-row">
+              <div class="transaction-icon">🛒</div>
+              <div class="transaction-info">
+                <div class="transaction-date">October 22, 2019 17:08</div>
+                <div class="transaction-name">
+                  <span style="width: 8px; height: 8px; background: #F97316; border-radius: 50%; display: inline-block;"></span>
+                  MIGROS SA
+                </div>
+              </div>
+              <div class="transaction-meta">
+                <div class="transaction-time">Less than 4h ago</div>
+                <div class="transaction-amount positive">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                  CHF 3500.24
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <p class="footer-text">© UBS 2020. All rights reserved.</p>
+    </main>
+  </div>
+
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('collapsed');
+    }
+  </script>
+</body>
+</html>
