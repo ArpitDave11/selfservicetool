@@ -1,37 +1,66 @@
 {
   "_meta": {
-    "version": "2.1.2",
-    "description": "GitLab Epic documentation templates — optimized for progressive disclosure, visual scannability, and decision-forward structure. Inspired by Google Design Docs, Amazon 6-Pagers, and Stripe engineering practices.",
+    "version": "2.1.3",
+    "description": "GitLab Epic documentation templates \u2014 optimized for progressive disclosure, visual scannability, and decision-forward structure. Inspired by Google Design Docs, Amazon 6-Pagers, and Stripe engineering practices.",
     "outputFormat": "gitlab-flavored-markdown",
     "changelog": {
       "2.1.0": "Removed TL;DR (merged into Objective), removed manual TOC (GitLab handles natively), renamed 'Metadata Header' to 'Epic Status'",
       "2.1.1": "Additive-only improvements: added titleFormat to User Stories, added hints/examples to underspecified sections, added mermaidDefaults/wordLimitConventions/collapsibleDefault/traceability to globalDefaults, standardized RACI and Risk hints, added categoryEnum to NFRs, added riskLevel field, added conditional to applicable sections",
-      "2.1.2": "Added refinementMode, qualityRules, wordTargetInterpretation, and antiPatterns to globalDefaults. Added qualityGate to each template. Refinement now prioritizes density over length — tighten, don't expand."
+      "2.1.2": "Added refinementMode, qualityRules, wordTargetInterpretation, and antiPatterns to globalDefaults. Added qualityGate to each template. Refinement now prioritizes density over length \u2014 tighten, don't expand.",
+      "2.1.3": "Fixed: epic title generation (added epicTitle guidance), date duplication on refine (added refinementFieldBehavior), diagram duplication on refine (added existingContentDetection to refinementMode), mermaid rendering reliability (replaced rigid rules with mermaidCraft coaching guidance)"
     },
     "globalDefaults": {
+      "epicTitle": {
+        "description": "The epic title is the H1 heading that appears BEFORE the table of contents. It is the name of the initiative \u2014 not a summary, not a sentence, not the Objective rephrased.",
+        "format": "Short noun phrase. 3-8 words. Title case. No periods.",
+        "guidance": "Think of it as what you'd name a Jira epic or a project folder. It should be instantly recognizable in a list of 50 other epics. A good title is specific enough that two people on the same team wouldn't confuse it with another project.",
+        "examples": {
+          "good": [
+            "Vendor Onboarding Portal V2",
+            "Kafka Migration: Order Pipeline",
+            "Partner API v3 Specification",
+            "Multi-Region DR for Payments Service",
+            "Checkout Address Autocomplete"
+          ],
+          "bad": [
+            "This epic covers the design and implementation of a new vendor onboarding portal to replace the existing manual process",
+            "Technical Design Document for Migration",
+            "New Feature Implementation Plan",
+            "Epic for Q3 Infrastructure Work",
+            "Improving the System Performance and Reliability of Our Platform"
+          ]
+        },
+        "refinementBehavior": "If the existing epic already has a title, preserve it exactly unless the user explicitly asks to change it. Never replace a clear project name with a generated summary sentence."
+      },
       "statusEmoji": {
-        "complete": "✅",
-        "in_progress": "🔄",
-        "pending": "⏳",
-        "blocked": "🚫",
-        "at_risk": "⚠️",
-        "not_started": "⬜"
+        "complete": "\u2705",
+        "in_progress": "\ud83d\udd04",
+        "pending": "\u23f3",
+        "blocked": "\ud83d\udeab",
+        "at_risk": "\u26a0\ufe0f",
+        "not_started": "\u2b1c"
       },
       "priorityLevels": {
-        "critical": "🔴",
-        "high": "🟠",
-        "medium": "🟡",
-        "low": "🟢"
+        "critical": "\ud83d\udd34",
+        "high": "\ud83d\udfe0",
+        "medium": "\ud83d\udfe1",
+        "low": "\ud83d\udfe2"
       },
       "reviewStates": {
-        "approved": "✅",
-        "pending": "⏳",
-        "reviewing": "🔄",
-        "changes_requested": "🟠",
-        "rejected": "🔴"
+        "approved": "\u2705",
+        "pending": "\u23f3",
+        "reviewing": "\ud83d\udd04",
+        "changes_requested": "\ud83d\udfe0",
+        "rejected": "\ud83d\udd34"
       },
       "markdownFeatures": {
-        "alerts": ["[!note]", "[!tip]", "[!important]", "[!warning]", "[!caution]"],
+        "alerts": [
+          "[!note]",
+          "[!tip]",
+          "[!important]",
+          "[!warning]",
+          "[!caution]"
+        ],
         "mermaidDiagrams": true,
         "taskLists": true,
         "collapsibleSections": true,
@@ -39,14 +68,20 @@
         "footnotes": true
       },
       "wordLimitConventions": {
-        "zeroMeaning": "When target and max are both 0, the section is table-only or diagram-only — no prose word limit applies",
+        "zeroMeaning": "When target and max are both 0, the section is table-only or diagram-only \u2014 no prose word limit applies",
         "nullMeaning": "Section intentionally has no word count constraint"
       },
       "collapsibleDefault": {
         "requiredSections": false,
         "optionalSections": true
       },
-      "wordCountExclusions": ["tables", "code-blocks", "diagrams", "checklists", "appendices"],
+      "wordCountExclusions": [
+        "tables",
+        "code-blocks",
+        "diagrams",
+        "checklists",
+        "appendices"
+      ],
       "mermaidDefaults": {
         "maxNodes": 15,
         "maxSequenceParticipants": 8,
@@ -58,12 +93,40 @@
         },
         "hint": "Optimize for readability at 1200px width. Group related nodes with subgraphs. Keep labels concise (3-5 words max per node)."
       },
+      "mermaidCraft": {
+        "description": "Guidance for producing mermaid diagrams that actually render. Written as coaching \u2014 not rigid syntax rules \u2014 because the failure modes are about thinking, not just syntax.",
+        "philosophy": "A diagram that doesn't render is worse than no diagram at all. A simple diagram that renders is better than a complex one that breaks. When in doubt, go simpler.",
+        "thinkBeforeYouDraw": [
+          "What is the ONE thing this diagram should communicate? If you can't answer in one sentence, the diagram is trying to do too much. Split it.",
+          "Who is the audience? An architect needs component relationships. A PM needs user flow. A DevOps engineer needs deployment topology. The same system might need different diagrams for different audiences \u2014 that's fine. But one diagram shouldn't serve all three.",
+          "Could this be a table instead? If the diagram is just showing a linear sequence with no branching, a numbered list or table might communicate better."
+        ],
+        "commonRenderingPitfalls": {
+          "description": "These are the patterns that most frequently cause mermaid rendering failures in GitLab. They're not syntax errors in isolation \u2014 they're patterns that become errors in combination.",
+          "specialCharacters": "Mermaid is sensitive to characters that look harmless: parentheses inside labels, quotes mixing styles, ampersands, angle brackets, colons in the wrong place. The safest approach is to keep node labels to plain alphanumeric text with spaces. If you need special characters in a label, wrap the entire label in double quotes.",
+          "labelComplexity": "The most common rendering failure is cramming too much text into a node label. If a label needs more than 5-6 words, the information probably belongs in prose below the diagram, not inside the node. Use short names in the diagram, explain in text.",
+          "edgeLabels": "Edge labels (the text on arrows) fail more often than node labels. Keep them to 2-3 words maximum. 'sends order' works. 'sends order data via async message queue' will likely break. If the interaction needs that much explanation, add a footnote below the diagram.",
+          "subgraphNesting": "One level of subgraph grouping works reliably. Two levels usually works. Three levels is where things start breaking unpredictably. If you need three levels of nesting, your diagram is too complex \u2014 split into multiple diagrams.",
+          "sequenceDiagramNotes": "Notes in sequence diagrams are fragile. 'Note over' and 'Note right of' work, but long note text or notes spanning many participants often break. Keep notes very short or skip them and explain in prose.",
+          "ganttDateFormats": "Gantt charts are strict about date formats. Stick to YYYY-MM-DD. Relative dates ('after task1') work but get confusing in complex charts."
+        },
+        "buildingReliableDiagrams": {
+          "approach": "Build incrementally, not all at once. Start with 3-4 nodes and the core relationship. Verify the pattern works in your head. Then add complexity one layer at a time. If you're generating a 20-node diagram in one shot, you're probably going to hit a rendering issue.",
+          "nodeIdStrategy": "Use short, clean IDs (A, B, C or svc1, svc2, db1) for the node identifiers and put the human-readable names in the labels. This separates the plumbing from the presentation and reduces the chance that a long name breaks a connection.",
+          "connectionSimplicity": "Every arrow you add is a potential rendering failure point. Ask yourself: does the reader need to see this connection, or do they already know it? An API calling a database is obvious \u2014 you might not need that arrow if it clutters the diagram.",
+          "testingMentality": "Treat diagram generation like code. The simplest version that communicates the point is the best version. You can always add complexity in a follow-up if the reader asks for more detail."
+        },
+        "whenDiagramsGoWrong": {
+          "description": "If a diagram is failing to render, the instinct is to fix the syntax. Often the better move is to simplify the diagram. A diagram that's failing is usually too complex.",
+          "recoveryApproach": "Strip back to the 3-4 most important nodes. Get that rendering. Then add back elements one at a time. This is faster than debugging a complex diagram."
+        }
+      },
       "raciRules": {
         "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells. If someone is both R and A, mark as R/A in bold.",
         "validation": "Exactly one A per row is mandatory"
       },
       "riskLevels": {
-        "full": "Heat map (5×5 with colored emoji) + detailed register table + contingency column",
+        "full": "Heat map (5\u00d75 with colored emoji) + detailed register table + contingency column",
         "standard": "Register table with columns: Risk, Likelihood, Impact, Mitigation, Owner",
         "light": "Simple risk table without heat map or scoring"
       },
@@ -76,14 +139,14 @@
         }
       },
       "wordTargetInterpretation": {
-        "target": "IDEAL word count — the sweet spot. NOT a minimum to pad towards. Content that says everything needed in fewer words is BETTER, not worse.",
+        "target": "IDEAL word count \u2014 the sweet spot. NOT a minimum to pad towards. Content that says everything needed in fewer words is BETTER, not worse.",
         "max": "Hard ceiling. Never exceed. But hitting max usually means the section is bloated.",
         "sweetSpot": "60-85% of target is often the quality zone. Hitting exactly target usually means filler was added.",
         "rule": "If the existing content already covers all required points below the target, DO NOT add words to reach the target. Shorter + complete > longer + padded."
       },
       "refinementMode": {
         "description": "Rules that apply when refining/editing an existing epic, NOT generating from scratch.",
-        "corePrinciple": "Refinement means TIGHTEN, not EXPAND. The goal is to increase information density — more signal per sentence, fewer total sentences.",
+        "corePrinciple": "Refinement means TIGHTEN, not EXPAND. The goal is to increase information density \u2014 more signal per sentence, fewer total sentences.",
         "operations": {
           "cut": {
             "priority": 1,
@@ -101,15 +164,27 @@
             "priority": 2,
             "description": "Replace vague statements with specific, quantified, actionable ones.",
             "examples": [
-              { "before": "Improve system performance significantly", "after": "Reduce P99 latency from 1200ms to <300ms" },
-              { "before": "Ensure proper security measures are in place", "after": "TLS 1.3 for transit, AES-256 at rest, IAM roles scoped to least-privilege" },
-              { "before": "The system should handle increased load", "after": "Auto-scale from 3 to 12 pods at 70% CPU, supporting 10K→50K RPM" },
-              { "before": "Users should have a good experience", "after": "Checkout completion in <90s, zero full-page reloads, WCAG 2.1 AA compliant" }
+              {
+                "before": "Improve system performance significantly",
+                "after": "Reduce P99 latency from 1200ms to <300ms"
+              },
+              {
+                "before": "Ensure proper security measures are in place",
+                "after": "TLS 1.3 for transit, AES-256 at rest, IAM roles scoped to least-privilege"
+              },
+              {
+                "before": "The system should handle increased load",
+                "after": "Auto-scale from 3 to 12 pods at 70% CPU, supporting 10K\u219250K RPM"
+              },
+              {
+                "before": "Users should have a good experience",
+                "after": "Checkout completion in <90s, zero full-page reloads, WCAG 2.1 AA compliant"
+              }
             ]
           },
           "restructure": {
             "priority": 3,
-            "description": "Move misplaced content to the correct section. Do NOT duplicate — move.",
+            "description": "Move misplaced content to the correct section. Do NOT duplicate \u2014 move.",
             "rule": "If technical details appear in Business Context, move them to Proposed Design. If business justification appears in Implementation Plan, move it to Business Context. Each section should contain ONLY what its hint describes."
           },
           "preserve": {
@@ -131,21 +206,50 @@
           "existingAtTarget": "If existing content is near target, focus on SHARPENING (replace vague with specific) not expanding.",
           "defaultBehavior": "Refinement should produce output that is the SAME length or SHORTER than input. If output is longer than input, justify every added sentence."
         },
-        "outputLengthCheck": "After refinement, compare output word count to input word count. If output is >10% longer than input, re-examine and cut. Refinement that makes things longer has failed."
+        "outputLengthCheck": "After refinement, compare output word count to input word count. If output is >10% longer than input, re-examine and cut. Refinement that makes things longer has failed.",
+        "refinementFieldBehavior": {
+          "description": "How to handle specific field types during refinement to avoid duplication bugs.",
+          "singletonFields": {
+            "description": "Fields that must appear EXACTLY ONCE in the document. During refinement, UPDATE the existing value \u2014 never append a second instance.",
+            "fields": [
+              "Generated on / Last Updated date \u2014 find the existing date in the Epic Status table and overwrite it. Do not add a second date anywhere.",
+              "Status \u2014 update in place, do not create a second Status field",
+              "Owner \u2014 update in place if changed",
+              "Epic Link \u2014 update in place if changed"
+            ],
+            "behavior": "SCAN the existing document for each singleton field BEFORE writing. If it exists, replace its value. If it doesn't exist, add it in the correct location (Epic Status table). Never produce a document with two 'Last Updated' or two 'Generated on' entries."
+          },
+          "epicStatusTable": {
+            "description": "The Epic Status table is the single source of truth for metadata. All date, status, and ownership fields live here and ONLY here.",
+            "refinementBehavior": "When refining, locate the existing Epic Status table. Update its cell values in place. Do not generate a second table. Do not add metadata fields outside this table."
+          }
+        },
+        "existingContentDetection": {
+          "description": "Before generating any content block, check if the existing document already contains it. This prevents duplication of diagrams, tables, and structured content.",
+          "diagrams": {
+            "behavior": "Before generating a mermaid diagram, scan the existing document for mermaid code blocks in the same section. If a diagram already exists: (1) evaluate whether it's accurate and complete, (2) if yes \u2014 keep it as-is, do not regenerate, (3) if it has issues \u2014 fix the existing diagram in place, do not add a second diagram alongside it, (4) never produce a section with two mermaid diagrams unless the section explicitly calls for multiple (e.g., current-state vs target-state).",
+            "detection": "Look for existing ```mermaid code fences within the same section heading scope. A diagram 'belongs to' the nearest preceding heading.",
+            "commonMistake": "Generating a fresh diagram and placing it above or below the existing one, resulting in two diagrams showing roughly the same thing."
+          },
+          "tables": {
+            "behavior": "Same principle as diagrams. If a table already exists in a section, update its rows/cells \u2014 do not create a duplicate table. The only exception is when the template explicitly requires multiple tables (e.g., heat map + register)."
+          },
+          "generalPrinciple": "Refinement is surgery, not reconstruction. Modify what exists. Do not tear down and rebuild unless the existing content is fundamentally broken."
+        }
       },
       "qualityRules": {
         "description": "Quality criteria that apply to ALL sections in ALL templates, for both generation and refinement.",
         "sentenceLevelRules": [
-          "Every sentence must pass the 'so what?' test — if you remove it and nothing is lost, it shouldn't exist",
+          "Every sentence must pass the 'so what?' test \u2014 if you remove it and nothing is lost, it shouldn't exist",
           "No sentence should begin with 'It is important to...', 'It should be noted that...', 'We need to ensure that...', or similar throat-clearing",
           "Prefer active voice: 'The service processes 10K requests/min' not 'Requests are processed by the service at a rate of 10K/min'",
-          "Lead with the specific, follow with the context — not the other way around",
+          "Lead with the specific, follow with the context \u2014 not the other way around",
           "One idea per sentence. If a sentence has 'and' connecting two unrelated points, split it or cut one"
         ],
         "sectionLevelRules": [
           "No section should repeat information from another section. If two sections say the same thing, one is wrong.",
           "Every section must add NEW information not available in any other section",
-          "Tables should not have prose preambles that restate what the table shows — let the table speak",
+          "Tables should not have prose preambles that restate what the table shows \u2014 let the table speak",
           "If a section only contains generic advice that applies to any project, it's empty. Fill it with project-specific content or remove it."
         ],
         "documentLevelRules": [
@@ -203,19 +307,26 @@
       }
     }
   },
-
   "business_requirement": {
     "requiredSections": {
       "Epic Status": {
         "wordLimit": 0,
         "format": "table",
-        "fields": ["Status", "Owner", "Reviewers", "Target Release", "Epic Link", "Last Updated"],
-        "hint": "Use reviewer status emoji (✅ ⏳ 🔄) for instant review-state visibility"
+        "fields": [
+          "Status",
+          "Owner",
+          "Reviewers",
+          "Target Release",
+          "Epic Link",
+          "Last Updated"
+        ],
+        "hint": "Use reviewer status emoji (\u2705 \u23f3 \ud83d\udd04) for instant review-state visibility",
+        "refinementHint": "During refinement: locate the existing Epic Status table and update cell values in place. Do NOT generate a second table or append duplicate date/status fields. 'Last Updated' or 'Generated on' must appear exactly once."
       },
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What are we doing, why, and what's the expected business outcome? This is the first thing anyone reads — make it count.",
+        "hint": "What are we doing, why, and what's the expected business outcome? This is the first thing anyone reads \u2014 make it count.",
         "example": "Implement an automated vendor onboarding portal to reduce average vendor setup time from 14 days to 2 days, eliminating $320K/year in manual processing costs and unblocking the procurement team's Q3 scale targets."
       },
       "Business Context & Problem Statement": {
@@ -227,7 +338,7 @@
         "target": 100,
         "max": 200,
         "format": "bullet-list",
-        "hint": "SMART format — Specific, Measurable, Achievable, Relevant, Time-bound"
+        "hint": "SMART format \u2014 Specific, Measurable, Achievable, Relevant, Time-bound"
       },
       "Scope & Non-Scope": {
         "target": 150,
@@ -238,21 +349,39 @@
         "target": 0,
         "max": 0,
         "format": "raci-table",
-        "columns": ["Activity", "Responsible", "Accountable", "Consulted", "Informed"],
+        "columns": [
+          "Activity",
+          "Responsible",
+          "Accountable",
+          "Consulted",
+          "Informed"
+        ],
         "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells. If someone is both R and A, mark as R/A in bold."
       },
       "Requirements": {
         "target": 200,
         "max": 500,
         "format": "priority-table",
-        "columns": ["ID", "Requirement", "Priority 🔴🟠🟡🟢", "Acceptance Criteria", "Owner"],
-        "hint": "Each requirement gets 30–80 words max. Use priority emoji for visual scanning. IDs should follow format BR-{nnn} for traceability."
+        "columns": [
+          "ID",
+          "Requirement",
+          "Priority \ud83d\udd34\ud83d\udfe0\ud83d\udfe1\ud83d\udfe2",
+          "Acceptance Criteria",
+          "Owner"
+        ],
+        "hint": "Each requirement gets 30\u201380 words max. Use priority emoji for visual scanning. IDs should follow format BR-{nnn} for traceability."
       },
       "Success Metrics": {
         "target": 100,
         "max": 200,
         "format": "metrics-table",
-        "columns": ["Metric", "Baseline (Current)", "Target", "Measurement Method", "Timeline"],
+        "columns": [
+          "Metric",
+          "Baseline (Current)",
+          "Target",
+          "Measurement Method",
+          "Timeline"
+        ],
         "hint": "Every metric must be quantified. 'Improve performance' is not a metric."
       },
       "Risk Assessment": {
@@ -260,15 +389,45 @@
         "max": 0,
         "format": "risk-heat-map-and-register",
         "riskLevel": "full",
-        "heatMapDimensions": { "likelihood": ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"], "impact": ["Negligible", "Minor", "Moderate", "Major", "Severe"] },
-        "registerColumns": ["ID", "Risk", "Likelihood", "Impact", "Score", "Owner", "Mitigation"],
-        "hint": "Show 5×5 heat map first using colored emoji (🟢🟡🟠🔴), then detailed register table below. Risk IDs should follow format RISK-{nnn}. Score = Likelihood (1-5) × Impact (1-5)."
+        "heatMapDimensions": {
+          "likelihood": [
+            "Rare",
+            "Unlikely",
+            "Possible",
+            "Likely",
+            "Almost Certain"
+          ],
+          "impact": [
+            "Negligible",
+            "Minor",
+            "Moderate",
+            "Major",
+            "Severe"
+          ]
+        },
+        "registerColumns": [
+          "ID",
+          "Risk",
+          "Likelihood",
+          "Impact",
+          "Score",
+          "Owner",
+          "Mitigation"
+        ],
+        "hint": "Show 5\u00d75 heat map first using colored emoji (\ud83d\udfe2\ud83d\udfe1\ud83d\udfe0\ud83d\udd34), then detailed register table below. Risk IDs should follow format RISK-{nnn}. Score = Likelihood (1-5) \u00d7 Impact (1-5)."
       },
       "Next Steps & Decision Log": {
         "target": 80,
         "max": 150,
         "format": "task-list-and-table",
-        "decisionLogColumns": ["ID", "Date", "Decision", "Status", "Decider", "Context"],
+        "decisionLogColumns": [
+          "ID",
+          "Date",
+          "Decision",
+          "Status",
+          "Decider",
+          "Context"
+        ],
         "hint": "Use GitLab task lists (- [ ]) for action items. Decision log captures key choices made."
       }
     },
@@ -282,14 +441,26 @@
         "target": 0,
         "max": 0,
         "format": "milestone-table",
-        "columns": ["Milestone", "Target Date", "Status", "Owner", "Dependencies"],
+        "columns": [
+          "Milestone",
+          "Target Date",
+          "Status",
+          "Owner",
+          "Dependencies"
+        ],
         "collapsible": false
       },
       "Budget & Cost-Benefit Analysis": {
         "target": 100,
         "max": 250,
         "format": "cost-table",
-        "columns": ["Category", "One-Time Cost", "Recurring Cost", "Expected Benefit", "ROI Timeline"],
+        "columns": [
+          "Category",
+          "One-Time Cost",
+          "Recurring Cost",
+          "Expected Benefit",
+          "ROI Timeline"
+        ],
         "collapsible": true
       },
       "Glossary": {
@@ -305,45 +476,73 @@
     "architectureFocus": "high-level-strategic",
     "expertRole": "senior business analyst",
     "description": "Business requirements focusing on ROI, stakeholder value, strategic alignment, and measurable outcomes. Uses RACI matrices, risk heat maps, and SMART objectives.",
-    "totalWordTarget": { "min": 1500, "max": 2500, "excludes": ["tables", "appendices"] },
+    "totalWordTarget": {
+      "min": 1500,
+      "max": 2500,
+      "excludes": [
+        "tables",
+        "appendices"
+      ]
+    },
     "qualityGate": {
       "description": "Pre-output checklist. Every item must pass before finalizing. Applies to both generation and refinement.",
       "checks": [
         "Objective is self-contained: a reader can decide whether to read further based on Objective alone",
-        "Every Business Objective is SMART — if any objective lacks a number or date, it fails",
+        "Every Business Objective is SMART \u2014 if any objective lacks a number or date, it fails",
         "No requirement in the Requirements table is longer than 80 words",
-        "Every row in Success Metrics has a specific number in Baseline and Target columns — no 'TBD' or 'N/A'",
-        "Risk Assessment has at least 3 risks — if fewer, the analysis is superficial",
+        "Every row in Success Metrics has a specific number in Baseline and Target columns \u2014 no 'TBD' or 'N/A'",
+        "Risk Assessment has at least 3 risks \u2014 if fewer, the analysis is superficial",
         "No section restates the Objective in different words",
-        "RACI table has exactly one A (Accountable) per row"
+        "RACI table has exactly one A (Accountable) per row",
+        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
       ],
       "refinementSpecific": [
-        "Output is same length or shorter than input — if longer, justify every added sentence",
+        "Output is same length or shorter than input \u2014 if longer, justify every added sentence",
         "No new filler phrases were introduced (check antiPatterns list)",
         "All specific numbers, dates, and names from the original are preserved",
-        "Vague statements were replaced with specific ones, not just reworded"
+        "Vague statements were replaced with specific ones, not just reworded",
+        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
+        "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
       ]
     },
     "progressiveDisclosure": {
-      "10_second_scan": ["Epic Status", "Objective"],
-      "2_minute_read": ["Business Objectives", "Scope & Non-Scope", "Success Metrics"],
-      "full_read": ["all sections"]
+      "10_second_scan": [
+        "Epic Status",
+        "Objective"
+      ],
+      "2_minute_read": [
+        "Business Objectives",
+        "Scope & Non-Scope",
+        "Success Metrics"
+      ],
+      "full_read": [
+        "all sections"
+      ]
     }
   },
-
   "technical_design": {
     "requiredSections": {
       "Epic Status": {
         "wordLimit": 0,
         "format": "table",
-        "fields": ["Status", "Owner", "Reviewers (with approval state)", "Target Release", "Epic Link", "Last Updated", "RFC Deadline"],
-        "hint": "Use Stripe-style gavel block — each reviewer gets status emoji showing approval state"
+        "fields": [
+          "Status",
+          "Owner",
+          "Reviewers (with approval state)",
+          "Target Release",
+          "Epic Link",
+          "Last Updated",
+          "RFC Deadline"
+        ],
+        "hint": "Use Stripe-style gavel block \u2014 each reviewer gets status emoji showing approval state",
+        "refinementHint": "During refinement: locate the existing Epic Status table and update cell values in place. Do NOT generate a second table or append duplicate date/status fields. 'Last Updated' or 'Generated on' must appear exactly once."
       },
       "Objective": {
         "target": 80,
         "max": 150,
         "hint": "What are we building, why, and what's the key architectural decision? One paragraph that gives full context.",
-        "example": "Design an event-driven notification service to replace the current synchronous email pipeline, enabling sub-second delivery across email, SMS, and push channels while supporting 10x current throughput (50K→500K messages/hour) with independent channel scaling."
+        "example": "Design an event-driven notification service to replace the current synchronous email pipeline, enabling sub-second delivery across email, SMS, and push channels while supporting 10x current throughput (50K\u2192500K messages/hour) with independent channel scaling."
       },
       "Context & Motivation": {
         "target": 200,
@@ -364,7 +563,7 @@
             "target": 200,
             "max": 400,
             "diagram": "mermaid-flowchart",
-            "hint": "Include a mermaid architecture diagram. The diagram IS the source of truth — no stale images. Keep to 15 nodes max for readability."
+            "hint": "Include a mermaid architecture diagram. The diagram IS the source of truth \u2014 no stale images. Keep to 15 nodes max for readability."
           },
           "Data Model & Storage": {
             "target": 100,
@@ -389,24 +588,47 @@
         "target": 200,
         "max": 600,
         "format": "comparison-table-and-prose",
-        "columns": ["Option", "Pros", "Cons", "Why Rejected/Chosen"],
-        "hint": "⭐ THIS IS THE MOST IMPORTANT SECTION (per Google). Shows rigorous thinking. Each alternative gets 100–200 words. Include at least 2 genuine alternatives — not straw men."
+        "columns": [
+          "Option",
+          "Pros",
+          "Cons",
+          "Why Rejected/Chosen"
+        ],
+        "hint": "\u2b50 THIS IS THE MOST IMPORTANT SECTION (per Google). Shows rigorous thinking. Each alternative gets 100\u2013200 words. Include at least 2 genuine alternatives \u2014 not straw men."
       },
       "Cross-Cutting Concerns": {
         "target": 200,
         "max": 400,
         "subsections": {
-          "Security & Privacy": { "target": 60, "max": 120 },
-          "Observability & Monitoring": { "target": 60, "max": 120 },
-          "Performance & Scalability": { "target": 60, "max": 120 },
-          "Accessibility": { "target": 30, "max": 60 }
+          "Security & Privacy": {
+            "target": 60,
+            "max": 120
+          },
+          "Observability & Monitoring": {
+            "target": 60,
+            "max": 120
+          },
+          "Performance & Scalability": {
+            "target": 60,
+            "max": 120
+          },
+          "Accessibility": {
+            "target": 30,
+            "max": 60
+          }
         }
       },
       "Implementation Plan": {
         "target": 150,
         "max": 400,
         "format": "phase-table",
-        "columns": ["Phase", "Scope", "Duration", "Dependencies", "Deliverable"],
+        "columns": [
+          "Phase",
+          "Scope",
+          "Duration",
+          "Dependencies",
+          "Deliverable"
+        ],
         "hint": "Break into shippable increments. Each phase should deliver testable value."
       },
       "Risks & Mitigations": {
@@ -414,7 +636,13 @@
         "max": 0,
         "format": "risk-register-table",
         "riskLevel": "standard",
-        "columns": ["Risk", "Likelihood", "Impact", "Mitigation", "Owner"],
+        "columns": [
+          "Risk",
+          "Likelihood",
+          "Impact",
+          "Mitigation",
+          "Owner"
+        ],
         "hint": "Use standard likelihood values: Rare, Unlikely, Possible, Likely, Almost Certain. Use standard impact values: Negligible, Minor, Moderate, Major, Severe."
       },
       "Open Questions": {
@@ -429,8 +657,15 @@
         "target": 0,
         "max": 0,
         "format": "adr-table",
-        "columns": ["ADR#", "Date", "Decision", "Status ✅🔄⛔", "Decider", "Link"],
-        "hint": "MADR format: Status → Context → Decision Drivers → Considered Options → Decision Outcome",
+        "columns": [
+          "ADR#",
+          "Date",
+          "Decision",
+          "Status \u2705\ud83d\udd04\u26d4",
+          "Decider",
+          "Link"
+        ],
+        "hint": "MADR format: Status \u2192 Context \u2192 Decision Drivers \u2192 Considered Options \u2192 Decision Outcome",
         "collapsible": false
       },
       "Team & Roles": {
@@ -457,39 +692,69 @@
     "storyStyle": "technical-narrative",
     "architectureFocus": "detailed-components-with-alternatives",
     "expertRole": "senior software architect",
-    "description": "Technical design documents following Google's design doc philosophy — context, goals/non-goals, proposed design, alternatives considered, and cross-cutting concerns. Emphasizes demonstrating rigorous thinking through explicit trade-off analysis.",
-    "totalWordTarget": { "min": 2000, "max": 4000, "excludes": ["tables", "code-blocks", "diagrams", "appendix"] },
+    "description": "Technical design documents following Google's design doc philosophy \u2014 context, goals/non-goals, proposed design, alternatives considered, and cross-cutting concerns. Emphasizes demonstrating rigorous thinking through explicit trade-off analysis.",
+    "totalWordTarget": {
+      "min": 2000,
+      "max": 4000,
+      "excludes": [
+        "tables",
+        "code-blocks",
+        "diagrams",
+        "appendix"
+      ]
+    },
     "qualityGate": {
       "description": "Pre-output checklist. Every item must pass before finalizing.",
       "checks": [
         "Objective states the key architectural decision, not just the feature being built",
-        "Non-Goals list has at least 2 items that could reasonably be goals — not straw men",
+        "Non-Goals list has at least 2 items that could reasonably be goals \u2014 not straw men",
         "Alternatives Considered has at least 2 genuine alternatives with real pros, not just the chosen option",
-        "Architecture diagram exists and matches the prose — no components mentioned in text but missing from diagram",
+        "Architecture diagram exists and matches the prose \u2014 no components mentioned in text but missing from diagram",
         "Every API contract has a working JSON request/response example",
         "No section opens with 'This section describes...' or 'In this section we will...'",
-        "Cross-Cutting Concerns contain project-specific details, not generic advice"
+        "Cross-Cutting Concerns contain project-specific details, not generic advice",
+        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "Technical details were not moved into Business Context or Objective",
         "Trade-off analysis in Alternatives Considered was preserved or strengthened, not diluted",
-        "No new throat-clearing phrases ('It is important to note...') were introduced"
+        "No new throat-clearing phrases ('It is important to note...') were introduced",
+        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
+        "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
       ]
     },
     "progressiveDisclosure": {
-      "10_second_scan": ["Epic Status", "Objective"],
-      "2_minute_read": ["Goals & Non-Goals", "Architecture Overview diagram", "Alternatives Considered table"],
-      "full_read": ["all sections"]
+      "10_second_scan": [
+        "Epic Status",
+        "Objective"
+      ],
+      "2_minute_read": [
+        "Goals & Non-Goals",
+        "Architecture Overview diagram",
+        "Alternatives Considered table"
+      ],
+      "full_read": [
+        "all sections"
+      ]
     }
   },
-
   "feature_specification": {
     "requiredSections": {
       "Epic Status": {
         "wordLimit": 0,
         "format": "table",
-        "fields": ["Status", "Product Owner", "Tech Lead", "Designer", "Target Release", "Feature Flag", "Epic Link"]
+        "fields": [
+          "Status",
+          "Product Owner",
+          "Tech Lead",
+          "Designer",
+          "Target Release",
+          "Feature Flag",
+          "Epic Link"
+        ],
+        "refinementHint": "During refinement: locate the existing Epic Status table and update cell values in place. Do NOT generate a second table or append duplicate date/status fields. 'Last Updated' or 'Generated on' must appear exactly once."
       },
       "Objective": {
         "target": 80,
@@ -500,7 +765,7 @@
       "Problem Statement": {
         "target": 100,
         "max": 250,
-        "hint": "Lead with evidence — user research data, support ticket volume, funnel drop-off rates. Not assumptions."
+        "hint": "Lead with evidence \u2014 user research data, support ticket volume, funnel drop-off rates. Not assumptions."
       },
       "User Stories": {
         "target": 100,
@@ -508,8 +773,11 @@
         "format": "story-list",
         "titleFormat": "US-{nn}: {Short descriptive title, 3-6 words}",
         "template": "**US-{nn}: {title}**\nAs a [persona], I want [action] so that [outcome]\n**Acceptance Criteria:** [testable criterion]",
-        "count": { "min": 3, "max": 7 },
-        "hint": "Each user story MUST begin with a bold, scannable title in the format 'US-01: One-Click Reorder' followed by the As a… statement. Titles should be unique, concise (3-6 words), and action-oriented. Each story must map to at least one testable acceptance criterion listed directly below it.",
+        "count": {
+          "min": 3,
+          "max": 7
+        },
+        "hint": "Each user story MUST begin with a bold, scannable title in the format 'US-01: One-Click Reorder' followed by the As a\u2026 statement. Titles should be unique, concise (3-6 words), and action-oriented. Each story must map to at least one testable acceptance criterion listed directly below it.",
         "example": "**US-01: Save Delivery Address**\nAs a returning customer, I want to save my delivery address so that I don't have to re-enter it on every order.\n**Acceptance Criteria:** User can save up to 5 addresses; saved addresses appear as selectable options at checkout; user can edit or delete saved addresses from account settings."
       },
       "Scope & Non-Scope": {
@@ -521,7 +789,13 @@
         "target": 0,
         "max": 0,
         "format": "requirements-table",
-        "columns": ["ID", "Requirement", "Priority 🔴🟠🟡🟢", "User Story Ref", "Acceptance Criteria"],
+        "columns": [
+          "ID",
+          "Requirement",
+          "Priority \ud83d\udd34\ud83d\udfe0\ud83d\udfe1\ud83d\udfe2",
+          "User Story Ref",
+          "Acceptance Criteria"
+        ],
         "hint": "Each requirement must be atomic (one testable behavior per row), reference a User Story by ID (e.g. US-01), and include pass/fail acceptance criteria. Priority must use emoji indicators. IDs should follow format FR-{nnn} for traceability."
       },
       "User Flows": {
@@ -534,21 +808,46 @@
         "target": 80,
         "max": 200,
         "format": "table",
-        "columns": ["Scenario", "Expected Behavior", "Error Message/UX", "Priority"]
+        "columns": [
+          "Scenario",
+          "Expected Behavior",
+          "Error Message/UX",
+          "Priority"
+        ]
       },
       "Non-Functional Requirements": {
         "target": 0,
         "max": 0,
         "format": "nfr-table",
-        "columns": ["Category", "Requirement", "Target", "Measurement"],
-        "categoryEnum": ["Performance", "Scalability", "Availability", "Security", "Accessibility", "Compliance", "Data Retention", "Usability"],
+        "columns": [
+          "Category",
+          "Requirement",
+          "Target",
+          "Measurement"
+        ],
+        "categoryEnum": [
+          "Performance",
+          "Scalability",
+          "Availability",
+          "Security",
+          "Accessibility",
+          "Compliance",
+          "Data Retention",
+          "Usability"
+        ],
         "hint": "Use standard categories from categoryEnum. Be specific and quantified: 'P99 latency < 200ms' not 'should be fast'. Every requirement must have a measurable target and a method to verify it."
       },
       "Analytics & Success Metrics": {
         "target": 80,
         "max": 200,
         "format": "metrics-table",
-        "columns": ["Metric", "Baseline", "Target", "Tracking Method", "Review Date"]
+        "columns": [
+          "Metric",
+          "Baseline",
+          "Target",
+          "Tracking Method",
+          "Review Date"
+        ]
       },
       "Launch Plan": {
         "target": 80,
@@ -573,7 +872,13 @@
         "max": 0,
         "format": "risk-register-table",
         "riskLevel": "standard",
-        "columns": ["Risk", "Likelihood", "Impact", "Mitigation", "Owner"],
+        "columns": [
+          "Risk",
+          "Likelihood",
+          "Impact",
+          "Mitigation",
+          "Owner"
+        ],
         "hint": "Use standard likelihood values: Rare, Unlikely, Possible, Likely, Almost Certain. Use standard impact values: Negligible, Minor, Moderate, Major, Severe.",
         "collapsible": false
       },
@@ -589,39 +894,67 @@
     "storyStyle": "feature-narrative",
     "architectureFocus": "user-interaction-and-outcomes",
     "expertRole": "senior product manager",
-    "description": "Feature specifications that bridge product and engineering — evidence-based problem statements, user stories with acceptance criteria, explicit edge cases, launch plans with rollback criteria, and measurable success metrics.",
-    "totalWordTarget": { "min": 1500, "max": 2500, "excludes": ["tables", "diagrams"] },
+    "description": "Feature specifications that bridge product and engineering \u2014 evidence-based problem statements, user stories with acceptance criteria, explicit edge cases, launch plans with rollback criteria, and measurable success metrics.",
+    "totalWordTarget": {
+      "min": 1500,
+      "max": 2500,
+      "excludes": [
+        "tables",
+        "diagrams"
+      ]
+    },
     "qualityGate": {
       "description": "Pre-output checklist. Every item must pass before finalizing.",
       "checks": [
-        "Problem Statement leads with evidence (data, ticket counts, metrics) — not opinions or assumptions",
-        "Every User Story has a bold title in US-{nn} format before the As a… statement",
+        "Problem Statement leads with evidence (data, ticket counts, metrics) \u2014 not opinions or assumptions",
+        "Every User Story has a bold title in US-{nn} format before the As a\u2026 statement",
         "Every User Story maps to at least one Functional Requirement via ID reference",
-        "Edge Cases table has at least 5 scenarios — if fewer, the happy-path bias is too strong",
+        "Edge Cases table has at least 5 scenarios \u2014 if fewer, the happy-path bias is too strong",
         "Non-Functional Requirements use specific numbers ('P99 < 200ms') not adjectives ('fast', 'responsive')",
-        "Launch Plan includes explicit rollback criteria — not just rollout steps",
-        "No section contains generic filler like 'ensure a good user experience'"
+        "Launch Plan includes explicit rollback criteria \u2014 not just rollout steps",
+        "No section contains generic filler like 'ensure a good user experience'",
+        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "User Story titles were not removed or made generic during refinement",
-        "Acceptance Criteria from original were preserved — not dropped or made vaguer",
-        "No new bullet points were added that fail the 'applies to every project' test"
+        "Acceptance Criteria from original were preserved \u2014 not dropped or made vaguer",
+        "No new bullet points were added that fail the 'applies to every project' test",
+        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
+        "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
       ]
     },
     "progressiveDisclosure": {
-      "10_second_scan": ["Epic Status", "Objective"],
-      "2_minute_read": ["Problem Statement", "User Stories", "Success Metrics"],
-      "full_read": ["all sections"]
+      "10_second_scan": [
+        "Epic Status",
+        "Objective"
+      ],
+      "2_minute_read": [
+        "Problem Statement",
+        "User Stories",
+        "Success Metrics"
+      ],
+      "full_read": [
+        "all sections"
+      ]
     }
   },
-
   "api_specification": {
     "requiredSections": {
       "Epic Status": {
         "wordLimit": 0,
         "format": "table",
-        "fields": ["Status", "API Owner", "Reviewers", "API Version", "Base URL(s)", "Auth Method", "Last Updated"]
+        "fields": [
+          "Status",
+          "API Owner",
+          "Reviewers",
+          "API Version",
+          "Base URL(s)",
+          "Auth Method",
+          "Last Updated"
+        ],
+        "refinementHint": "During refinement: locate the existing Epic Status table and update cell values in place. Do NOT generate a second table or append duplicate date/status fields. 'Last Updated' or 'Generated on' must appear exactly once."
       },
       "Objective": {
         "target": 80,
@@ -638,7 +971,14 @@
         "target": 0,
         "max": 0,
         "format": "schema-table",
-        "columns": ["Field", "Type", "Required", "Description", "Constraints", "Example"],
+        "columns": [
+          "Field",
+          "Type",
+          "Required",
+          "Description",
+          "Constraints",
+          "Example"
+        ],
         "hint": "One table per resource. Include validation rules and constraints. Mark required fields clearly."
       },
       "Endpoints": {
@@ -646,8 +986,19 @@
         "max": 1500,
         "format": "endpoint-blocks",
         "perEndpoint": {
-          "structure": ["Method + Path", "Description", "Parameters (path/query/header)", "Request Body (JSON code block)", "Response 2xx (JSON code block)", "Error Responses (table)", "Example cURL"],
-          "wordLimit": { "target": 100, "max": 300 }
+          "structure": [
+            "Method + Path",
+            "Description",
+            "Parameters (path/query/header)",
+            "Request Body (JSON code block)",
+            "Response 2xx (JSON code block)",
+            "Error Responses (table)",
+            "Example cURL"
+          ],
+          "wordLimit": {
+            "target": 100,
+            "max": 300
+          }
         },
         "hint": "Working examples are mandatory. Use diff code blocks ({+ new +} / {- old -}) for versioned changes."
       },
@@ -655,7 +1006,13 @@
         "target": 0,
         "max": 0,
         "format": "error-table",
-        "columns": ["HTTP Status", "Error Code", "Message", "Description", "Troubleshooting"],
+        "columns": [
+          "HTTP Status",
+          "Error Code",
+          "Message",
+          "Description",
+          "Troubleshooting"
+        ],
         "standardFormat": {
           "example": "{ \"error\": { \"code\": \"RESOURCE_NOT_FOUND\", \"message\": \"...\", \"request_id\": \"...\" } }"
         },
@@ -671,7 +1028,13 @@
         "target": 100,
         "max": 300,
         "format": "event-table-and-schema",
-        "columns": ["Event", "Trigger", "Payload Schema", "Delivery Guarantee", "Retry Policy"],
+        "columns": [
+          "Event",
+          "Trigger",
+          "Payload Schema",
+          "Delivery Guarantee",
+          "Retry Policy"
+        ],
         "hint": "Include payload examples. Specify at-least-once vs at-most-once delivery. Document idempotency keys.",
         "conditional": "Include only if API has event-driven components"
       }
@@ -687,14 +1050,24 @@
         "target": 0,
         "max": 0,
         "format": "multi-language-code-blocks",
-        "languages": ["cURL", "Python", "JavaScript", "Go"],
+        "languages": [
+          "cURL",
+          "Python",
+          "JavaScript",
+          "Go"
+        ],
         "collapsible": true
       },
       "Changelog": {
         "target": 0,
         "max": 0,
         "format": "changelog-table",
-        "columns": ["Version", "Date", "Change Type (Breaking/Feature/Fix)", "Description"],
+        "columns": [
+          "Version",
+          "Date",
+          "Change Type (Breaking/Feature/Fix)",
+          "Description"
+        ],
         "hint": "Use inline diff syntax for schema changes. Flag breaking changes with > [!caution] alerts.",
         "collapsible": false
       },
@@ -709,38 +1082,66 @@
     "storyStyle": "api-reference",
     "architectureFocus": "api-contract-and-flow",
     "expertRole": "senior API architect",
-    "description": "API specifications modeled after Stripe's gold standard — working examples for every endpoint, standardized error envelopes, explicit rate limits, webhook delivery guarantees, and versioning strategy. Developer experience is the primary design constraint.",
-    "totalWordTarget": { "min": 2000, "max": 5000, "excludes": ["code-blocks", "tables", "schemas"] },
+    "description": "API specifications modeled after Stripe's gold standard \u2014 working examples for every endpoint, standardized error envelopes, explicit rate limits, webhook delivery guarantees, and versioning strategy. Developer experience is the primary design constraint.",
+    "totalWordTarget": {
+      "min": 2000,
+      "max": 5000,
+      "excludes": [
+        "code-blocks",
+        "tables",
+        "schemas"
+      ]
+    },
     "qualityGate": {
       "description": "Pre-output checklist. Every item must pass before finalizing.",
       "checks": [
         "Every endpoint has a working cURL example that a developer could copy-paste and run",
-        "Every endpoint has at least one error response documented — not just the happy path",
+        "Every endpoint has at least one error response documented \u2014 not just the happy path",
         "Error codes follow a consistent naming convention (e.g., SCREAMING_SNAKE_CASE) across all endpoints",
         "Rate limits are exact numbers, not 'reasonable limits' or 'subject to change'",
-        "Resource schema tables have Example column filled for every field — no empty cells",
-        "Authentication section specifies token lifetime and refresh mechanism"
+        "Resource schema tables have Example column filled for every field \u2014 no empty cells",
+        "Authentication section specifies token lifetime and refresh mechanism",
+        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "No working code examples were removed or broken during refinement",
         "Endpoint paths and HTTP methods were not changed unless explicitly requested",
-        "Schema field names and types were preserved exactly"
+        "Schema field names and types were preserved exactly",
+        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
+        "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
       ]
     },
     "progressiveDisclosure": {
-      "10_second_scan": ["Epic Status", "Objective"],
-      "2_minute_read": ["Overview & Authentication", "Resource Definitions"],
-      "full_read": ["all endpoints and schemas"]
+      "10_second_scan": [
+        "Epic Status",
+        "Objective"
+      ],
+      "2_minute_read": [
+        "Overview & Authentication",
+        "Resource Definitions"
+      ],
+      "full_read": [
+        "all endpoints and schemas"
+      ]
     }
   },
-
   "infrastructure_design": {
     "requiredSections": {
       "Epic Status": {
         "wordLimit": 0,
         "format": "table",
-        "fields": ["Status", "Owner", "Reviewers", "Target Environment", "Cloud Provider", "Last Updated", "RFC Deadline"]
+        "fields": [
+          "Status",
+          "Owner",
+          "Reviewers",
+          "Target Environment",
+          "Cloud Provider",
+          "Last Updated",
+          "RFC Deadline"
+        ],
+        "refinementHint": "During refinement: locate the existing Epic Status table and update cell values in place. Do NOT generate a second table or append duplicate date/status fields. 'Last Updated' or 'Generated on' must appear exactly once."
       },
       "Objective": {
         "target": 80,
@@ -757,20 +1158,29 @@
         "target": 0,
         "max": 0,
         "format": "slo-table",
-        "columns": ["Metric (SLI)", "Current Value", "Target SLO", "Error Budget", "Measurement"],
+        "columns": [
+          "Metric (SLI)",
+          "Current Value",
+          "Target SLO",
+          "Error Budget",
+          "Measurement"
+        ],
         "hint": "Availability, latency percentiles, throughput, error rate. Current vs target. Every SLO must have an error budget calculated."
       },
       "Architecture Overview": {
         "target": 300,
         "max": 500,
         "diagram": "mermaid-flowchart",
-        "hint": "Mermaid architecture diagram is mandatory. Show all services, data stores, network boundaries, and traffic flow. Keep to 15 nodes max for readability — use subgraphs to group related components."
+        "hint": "Mermaid architecture diagram is mandatory. Show all services, data stores, network boundaries, and traffic flow. Keep to 15 nodes max for readability \u2014 use subgraphs to group related components."
       },
       "Component Design": {
         "target": 200,
         "max": 600,
         "format": "per-component-subsections",
-        "perComponent": { "target": 80, "max": 200 },
+        "perComponent": {
+          "target": 80,
+          "max": 200
+        },
         "hint": "One subsection per major component: compute, storage, networking, CDN, queues, etc. Each component must answer: how does it fail, how do we know, how do we recover?"
       },
       "Network & Security Architecture": {
@@ -778,51 +1188,96 @@
         "max": 400,
         "diagram": "mermaid-flowchart",
         "subsections": {
-          "Network Topology": { "target": 60, "max": 150 },
-          "IAM & Access Controls": { "target": 50, "max": 120 },
-          "Encryption & Secrets Management": { "target": 50, "max": 120 }
+          "Network Topology": {
+            "target": 60,
+            "max": 150
+          },
+          "IAM & Access Controls": {
+            "target": 50,
+            "max": 120
+          },
+          "Encryption & Secrets Management": {
+            "target": 50,
+            "max": 120
+          }
         }
       },
       "Environments & CI/CD": {
         "target": 100,
         "max": 250,
         "format": "environment-table-and-pipeline",
-        "columns": ["Environment", "Purpose", "URL", "Deployment Method", "Approval Required"],
-        "hint": "Include pipeline diagram (mermaid) showing build → test → stage → prod flow"
+        "columns": [
+          "Environment",
+          "Purpose",
+          "URL",
+          "Deployment Method",
+          "Approval Required"
+        ],
+        "hint": "Include pipeline diagram (mermaid) showing build \u2192 test \u2192 stage \u2192 prod flow"
       },
       "Observability": {
         "target": 100,
         "max": 300,
         "subsections": {
-          "SLI Dashboards": { "target": 40, "max": 80 },
+          "SLI Dashboards": {
+            "target": 40,
+            "max": 80
+          },
           "Alerting Rules": {
             "target": 0,
             "max": 0,
             "format": "alert-table",
-            "columns": ["Alert", "Condition", "Severity", "Notification Channel", "Runbook Link"]
+            "columns": [
+              "Alert",
+              "Condition",
+              "Severity",
+              "Notification Channel",
+              "Runbook Link"
+            ]
           },
-          "Logging Strategy": { "target": 40, "max": 80 }
+          "Logging Strategy": {
+            "target": 40,
+            "max": 80
+          }
         }
       },
       "Disaster Recovery": {
         "target": 150,
         "max": 400,
         "format": "dr-table-and-procedure",
-        "columns": ["Scenario", "RPO", "RTO", "Recovery Procedure", "Last Tested"],
+        "columns": [
+          "Scenario",
+          "RPO",
+          "RTO",
+          "Recovery Procedure",
+          "Last Tested"
+        ],
         "hint": "Include explicit RPO/RTO targets per failure scenario. When was the last DR drill?"
       },
       "Scaling Strategy": {
         "target": 100,
         "max": 250,
         "format": "scaling-table",
-        "columns": ["Component", "Current Capacity", "Auto-Scale Trigger", "Max Scale", "Cost at Max"],
+        "columns": [
+          "Component",
+          "Current Capacity",
+          "Auto-Scale Trigger",
+          "Max Scale",
+          "Cost at Max"
+        ],
         "hint": "Horizontal vs vertical. Auto-scaling policies. Include cost implications at scale."
       },
       "Cost Analysis": {
         "target": 0,
         "max": 0,
         "format": "cost-table",
-        "columns": ["Service/Resource", "Spec", "Monthly Cost", "Annual Cost", "Notes"],
+        "columns": [
+          "Service/Resource",
+          "Spec",
+          "Monthly Cost",
+          "Annual Cost",
+          "Notes"
+        ],
         "hint": "Include current spend vs projected spend. Flag top 3 cost drivers."
       }
     },
@@ -831,21 +1286,41 @@
         "target": 0,
         "max": 0,
         "format": "projection-table",
-        "columns": ["Metric", "Current", "6 Months", "12 Months", "24 Months", "Action Required"],
+        "columns": [
+          "Metric",
+          "Current",
+          "6 Months",
+          "12 Months",
+          "24 Months",
+          "Action Required"
+        ],
         "collapsible": false
       },
       "Decision Log (ADRs)": {
         "target": 0,
         "max": 0,
         "format": "adr-table",
-        "columns": ["ADR#", "Date", "Decision", "Status ✅🔄⛔", "Decider", "Link"],
+        "columns": [
+          "ADR#",
+          "Date",
+          "Decision",
+          "Status \u2705\ud83d\udd04\u26d4",
+          "Decider",
+          "Link"
+        ],
         "collapsible": false
       },
       "Operational Runbooks": {
         "target": 0,
         "max": 0,
         "format": "runbook-index",
-        "columns": ["Runbook", "Scenario", "Owner", "Last Reviewed", "Link"],
+        "columns": [
+          "Runbook",
+          "Scenario",
+          "Owner",
+          "Last Reviewed",
+          "Link"
+        ],
         "collapsible": true,
         "hint": "Index of runbooks with links. Detailed procedures live in separate docs."
       },
@@ -860,38 +1335,68 @@
     "storyStyle": "infrastructure-narrative",
     "architectureFocus": "deployment-and-operations",
     "expertRole": "senior DevOps/SRE engineer",
-    "description": "Infrastructure design documents emphasizing operational readiness — explicit SLA/SLO targets, cost analysis, disaster recovery with tested RPO/RTO, observability with alerting rules, and scaling strategies with cost implications. Every component must answer: how does it fail, how do we know, how do we recover?",
-    "totalWordTarget": { "min": 2500, "max": 4500, "excludes": ["tables", "diagrams", "runbooks"] },
+    "description": "Infrastructure design documents emphasizing operational readiness \u2014 explicit SLA/SLO targets, cost analysis, disaster recovery with tested RPO/RTO, observability with alerting rules, and scaling strategies with cost implications. Every component must answer: how does it fail, how do we know, how do we recover?",
+    "totalWordTarget": {
+      "min": 2500,
+      "max": 4500,
+      "excludes": [
+        "tables",
+        "diagrams",
+        "runbooks"
+      ]
+    },
     "qualityGate": {
       "description": "Pre-output checklist. Every item must pass before finalizing.",
       "checks": [
-        "SLA/SLO table has Current Value filled for every metric — shows we measured before designing",
+        "SLA/SLO table has Current Value filled for every metric \u2014 shows we measured before designing",
         "Every component in Component Design answers: how does it fail, how do we know, how do we recover",
-        "Disaster Recovery table has 'Last Tested' column filled — untested DR plans are fiction",
+        "Disaster Recovery table has 'Last Tested' column filled \u2014 untested DR plans are fiction",
         "Cost Analysis flags the top 3 cost drivers explicitly",
-        "Scaling Strategy includes cost-at-max for every component — scaling without cost awareness is dangerous",
-        "Architecture diagram matches the Component Design sections — no orphan components in either"
+        "Scaling Strategy includes cost-at-max for every component \u2014 scaling without cost awareness is dangerous",
+        "Architecture diagram matches the Component Design sections \u2014 no orphan components in either",
+        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "Specific cost figures, SLO numbers, and capacity numbers were preserved exactly",
         "No alerting rules or runbook links were removed",
-        "Generic statements like 'follow security best practices' were replaced with specifics, not just kept"
+        "Generic statements like 'follow security best practices' were replaced with specifics, not just kept",
+        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
+        "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
       ]
     },
     "progressiveDisclosure": {
-      "10_second_scan": ["Epic Status", "Objective", "SLA/SLO Requirements table"],
-      "2_minute_read": ["Architecture Overview diagram", "Cost Analysis", "Disaster Recovery table"],
-      "full_read": ["all sections"]
+      "10_second_scan": [
+        "Epic Status",
+        "Objective",
+        "SLA/SLO Requirements table"
+      ],
+      "2_minute_read": [
+        "Architecture Overview diagram",
+        "Cost Analysis",
+        "Disaster Recovery table"
+      ],
+      "full_read": [
+        "all sections"
+      ]
     }
   },
-
   "migration_plan": {
     "requiredSections": {
       "Epic Status": {
         "wordLimit": 0,
         "format": "table",
-        "fields": ["Status", "Migration Lead", "Reviewers", "Go/No-Go Date", "Rollback Deadline", "Epic Link", "War Room Channel"]
+        "fields": [
+          "Status",
+          "Migration Lead",
+          "Reviewers",
+          "Go/No-Go Date",
+          "Rollback Deadline",
+          "Epic Link",
+          "War Room Channel"
+        ],
+        "refinementHint": "During refinement: locate the existing Epic Status table and update cell values in place. Do NOT generate a second table or append duplicate date/status fields. 'Last Updated' or 'Generated on' must appear exactly once."
       },
       "Objective": {
         "target": 80,
@@ -925,23 +1430,60 @@
         "target": 0,
         "max": 0,
         "format": "raci-table",
-        "columns": ["Activity", "Responsible", "Accountable", "Consulted", "Informed"],
-        "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells. Migration plans cross multiple teams — RACI eliminates 'I thought they were doing that' failures."
+        "columns": [
+          "Activity",
+          "Responsible",
+          "Accountable",
+          "Consulted",
+          "Informed"
+        ],
+        "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells. Migration plans cross multiple teams \u2014 RACI eliminates 'I thought they were doing that' failures."
       },
       "Risk Assessment": {
         "target": 0,
         "max": 0,
         "format": "risk-heat-map-and-register",
         "riskLevel": "full",
-        "heatMapDimensions": { "likelihood": ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"], "impact": ["Negligible", "Minor", "Moderate", "Major", "Severe"] },
-        "registerColumns": ["ID", "Risk", "Likelihood", "Impact", "Score", "Owner", "Mitigation", "Contingency"],
-        "hint": "⭐ HIGHEST-STAKES DOCUMENT TYPE. Risk assessment must be thorough. Include contingency plans (what we do if the mitigation fails), not just mitigations. Risk IDs should follow format RISK-{nnn}. Score = Likelihood (1-5) × Impact (1-5)."
+        "heatMapDimensions": {
+          "likelihood": [
+            "Rare",
+            "Unlikely",
+            "Possible",
+            "Likely",
+            "Almost Certain"
+          ],
+          "impact": [
+            "Negligible",
+            "Minor",
+            "Moderate",
+            "Major",
+            "Severe"
+          ]
+        },
+        "registerColumns": [
+          "ID",
+          "Risk",
+          "Likelihood",
+          "Impact",
+          "Score",
+          "Owner",
+          "Mitigation",
+          "Contingency"
+        ],
+        "hint": "\u2b50 HIGHEST-STAKES DOCUMENT TYPE. Risk assessment must be thorough. Include contingency plans (what we do if the mitigation fails), not just mitigations. Risk IDs should follow format RISK-{nnn}. Score = Likelihood (1-5) \u00d7 Impact (1-5)."
       },
       "Timeline & Milestones": {
         "target": 0,
         "max": 0,
         "format": "milestone-table",
-        "columns": ["Phase", "Milestone", "Target Date", "Status", "Owner", "Go/No-Go Criteria"],
+        "columns": [
+          "Phase",
+          "Milestone",
+          "Target Date",
+          "Status",
+          "Owner",
+          "Go/No-Go Criteria"
+        ],
         "diagram": "mermaid-gantt",
         "hint": "Include Gantt chart via mermaid. Each milestone needs explicit go/no-go criteria."
       },
@@ -962,9 +1504,20 @@
         "target": 150,
         "max": 400,
         "subsections": {
-          "Pre-Migration Validation": { "target": 40, "max": 100 },
-          "Dry Run Plan": { "target": 60, "max": 150, "hint": "When, how many dry runs, success criteria" },
-          "Post-Migration Validation": { "target": 50, "max": 150, "format": "checklist" }
+          "Pre-Migration Validation": {
+            "target": 40,
+            "max": 100
+          },
+          "Dry Run Plan": {
+            "target": 60,
+            "max": 150,
+            "hint": "When, how many dry runs, success criteria"
+          },
+          "Post-Migration Validation": {
+            "target": 50,
+            "max": 150,
+            "format": "checklist"
+          }
         }
       },
       "Data Security & Compliance": {
@@ -978,7 +1531,13 @@
         "target": 0,
         "max": 0,
         "format": "comms-table",
-        "columns": ["Audience", "Channel", "Timing", "Content/Template", "Owner"],
+        "columns": [
+          "Audience",
+          "Channel",
+          "Timing",
+          "Content/Template",
+          "Owner"
+        ],
         "collapsible": false,
         "hint": "Who needs to know what, when? Include customer-facing comms if applicable."
       },
@@ -997,7 +1556,12 @@
         "target": 0,
         "max": 0,
         "format": "table",
-        "columns": ["Item", "What Happened", "Impact", "Action for Next Time"],
+        "columns": [
+          "Item",
+          "What Happened",
+          "Impact",
+          "Action for Next Time"
+        ],
         "collapsible": true,
         "hint": "Fill in post-migration. Template exists so it doesn't get forgotten."
       }
@@ -1006,39 +1570,68 @@
     "storyStyle": "migration-playbook",
     "architectureFocus": "before-after-with-transition",
     "expertRole": "senior migration specialist / SRE",
-    "description": "Migration plans as operational playbooks — current/target state architectures, explicit RACI ownership, risk heat maps with contingency plans, step-by-step cutover and rollback procedures, dry run plans, and communication matrices. Designed for the highest-stakes document type in engineering.",
-    "totalWordTarget": { "min": 2500, "max": 4000, "excludes": ["tables", "diagrams", "checklists"] },
+    "description": "Migration plans as operational playbooks \u2014 current/target state architectures, explicit RACI ownership, risk heat maps with contingency plans, step-by-step cutover and rollback procedures, dry run plans, and communication matrices. Designed for the highest-stakes document type in engineering.",
+    "totalWordTarget": {
+      "min": 2500,
+      "max": 4000,
+      "excludes": [
+        "tables",
+        "diagrams",
+        "checklists"
+      ]
+    },
     "qualityGate": {
       "description": "Pre-output checklist. Every item must pass before finalizing.",
       "checks": [
-        "Current State and Target State both have architecture diagrams — text-only descriptions fail during execution",
-        "Risk Assessment has at least 5 risks with Contingency plans (not just Mitigations) — this is the highest-stakes doc type",
+        "Current State and Target State both have architecture diagrams \u2014 text-only descriptions fail during execution",
+        "Risk Assessment has at least 5 risks with Contingency plans (not just Mitigations) \u2014 this is the highest-stakes doc type",
         "Cutover Plan has time estimates for every step and a named responsible person",
         "Rollback Plan has explicit trigger conditions (what metrics/events activate rollback)",
         "Dry Run Plan specifies how many dry runs and success criteria for each",
         "RACI Matrix has exactly one A per row and covers at least: cutover, rollback, communication, validation",
-        "Every milestone in Timeline has Go/No-Go criteria — milestones without criteria are just dates"
+        "Every milestone in Timeline has Go/No-Go criteria \u2014 milestones without criteria are just dates",
+        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
-        "No steps were removed from Cutover or Rollback procedures — steps can be reworded but not dropped",
+        "No steps were removed from Cutover or Rollback procedures \u2014 steps can be reworded but not dropped",
         "Time estimates, dates, and rollback windows were preserved exactly",
-        "Risk contingency plans were not downgraded to generic mitigations"
+        "Risk contingency plans were not downgraded to generic mitigations",
+        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
+        "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
       ]
     },
     "progressiveDisclosure": {
-      "10_second_scan": ["Epic Status", "Objective"],
-      "2_minute_read": ["Current State diagram", "Target State diagram", "Timeline & Milestones", "Risk heat map"],
-      "full_read": ["all sections including Cutover and Rollback procedures"]
+      "10_second_scan": [
+        "Epic Status",
+        "Objective"
+      ],
+      "2_minute_read": [
+        "Current State diagram",
+        "Target State diagram",
+        "Timeline & Milestones",
+        "Risk heat map"
+      ],
+      "full_read": [
+        "all sections including Cutover and Rollback procedures"
+      ]
     }
   },
-
   "integration_spec": {
     "requiredSections": {
       "Epic Status": {
         "wordLimit": 0,
         "format": "table",
-        "fields": ["Status", "Integration Owner", "Source System Owner", "Target System Owner", "Reviewers", "Last Updated"]
+        "fields": [
+          "Status",
+          "Integration Owner",
+          "Source System Owner",
+          "Target System Owner",
+          "Reviewers",
+          "Last Updated"
+        ],
+        "refinementHint": "During refinement: locate the existing Epic Status table and update cell values in place. Do NOT generate a second table or append duplicate date/status fields. 'Last Updated' or 'Generated on' must appear exactly once."
       },
       "Objective": {
         "target": 80,
@@ -1056,14 +1649,29 @@
         "target": 0,
         "max": 0,
         "format": "system-table",
-        "columns": ["System", "Owner Team", "Base URL", "Auth Mechanism", "Rate Limits", "SLA"],
+        "columns": [
+          "System",
+          "Owner Team",
+          "Base URL",
+          "Auth Mechanism",
+          "Rate Limits",
+          "SLA"
+        ],
         "hint": "One row per system. Include all environments (dev/staging/prod) if URLs differ."
       },
       "Data Contract & Mappings": {
         "target": 100,
         "max": 300,
         "format": "mapping-table",
-        "columns": ["Source Field", "Source Type", "Target Field", "Target Type", "Transformation", "Required", "Notes"],
+        "columns": [
+          "Source Field",
+          "Source Type",
+          "Target Field",
+          "Target Type",
+          "Transformation",
+          "Required",
+          "Notes"
+        ],
         "hint": "Include schema validation rules. Use inline diff for contract changes. Document null-handling and default values for every field."
       },
       "Integration Flows": {
@@ -1071,39 +1679,77 @@
         "max": 400,
         "diagram": "mermaid-sequence",
         "subsections": {
-          "Happy Path": { "diagram": "mermaid-sequence", "required": true },
-          "Error / Retry Path": { "diagram": "mermaid-sequence", "required": true, "hint": "DO NOT SKIP. Error flows are where integrations actually fail." },
-          "Recovery / Reconciliation Path": { "diagram": "mermaid-sequence", "required": false, "conditional": "Include if data consistency guarantees require reconciliation between systems." }
+          "Happy Path": {
+            "diagram": "mermaid-sequence",
+            "required": true
+          },
+          "Error / Retry Path": {
+            "diagram": "mermaid-sequence",
+            "required": true,
+            "hint": "DO NOT SKIP. Error flows are where integrations actually fail."
+          },
+          "Recovery / Reconciliation Path": {
+            "diagram": "mermaid-sequence",
+            "required": false,
+            "conditional": "Include if data consistency guarantees require reconciliation between systems."
+          }
         }
       },
       "Error Handling & Recovery": {
         "target": 150,
         "max": 300,
         "format": "error-strategy-table",
-        "columns": ["Error Scenario", "Detection", "Retry Policy", "Dead Letter Queue", "Alert", "Manual Intervention"],
+        "columns": [
+          "Error Scenario",
+          "Detection",
+          "Retry Policy",
+          "Dead Letter Queue",
+          "Alert",
+          "Manual Intervention"
+        ],
         "hint": "Retry policies: max attempts, backoff strategy (exponential/linear), circuit breaker thresholds. Every error scenario must have a defined detection method and resolution path."
       },
       "Security & Data Privacy": {
         "target": 100,
         "max": 250,
         "subsections": {
-          "Authentication & Authorization": { "target": 40, "max": 80 },
-          "Data Classification & PII": { "target": 30, "max": 80 },
-          "Encryption": { "target": 30, "max": 60 }
+          "Authentication & Authorization": {
+            "target": 40,
+            "max": 80
+          },
+          "Data Classification & PII": {
+            "target": 30,
+            "max": 80
+          },
+          "Encryption": {
+            "target": 30,
+            "max": 60
+          }
         }
       },
       "Monitoring & Alerting": {
         "target": 0,
         "max": 0,
         "format": "monitoring-table",
-        "columns": ["Metric/SLI", "Threshold", "Alert Severity", "Notification", "Runbook"],
+        "columns": [
+          "Metric/SLI",
+          "Threshold",
+          "Alert Severity",
+          "Notification",
+          "Runbook"
+        ],
         "hint": "Monitor integration health, not just system health. Track: message throughput, error rate, latency, queue depth."
       },
       "Performance & SLAs": {
         "target": 0,
         "max": 0,
         "format": "sla-table",
-        "columns": ["Metric", "Requirement", "Measurement Method", "Breach Escalation"],
+        "columns": [
+          "Metric",
+          "Requirement",
+          "Measurement Method",
+          "Breach Escalation"
+        ],
         "hint": "Define SLAs for end-to-end data propagation time, not just individual system response time."
       }
     },
@@ -1118,9 +1764,18 @@
         "target": 80,
         "max": 200,
         "subsections": {
-          "Contract Testing": { "target": 30, "max": 60 },
-          "Integration Testing": { "target": 30, "max": 60 },
-          "Mock Services": { "target": 20, "max": 60 }
+          "Contract Testing": {
+            "target": 30,
+            "max": 60
+          },
+          "Integration Testing": {
+            "target": 30,
+            "max": 60
+          },
+          "Mock Services": {
+            "target": 20,
+            "max": 60
+          }
         },
         "collapsible": false
       },
@@ -1142,29 +1797,50 @@
     "storyStyle": "integration-contract",
     "architectureFocus": "sequence-and-error-flows",
     "expertRole": "senior integration architect",
-    "description": "Integration specifications as enforceable contracts — explicit data mappings, sequence diagrams for happy AND error paths, retry policies with circuit breaker thresholds, SLA definitions with breach escalation, and monitoring that tracks integration health specifically. Error flows are required, not optional.",
-    "totalWordTarget": { "min": 1800, "max": 3500, "excludes": ["tables", "diagrams", "runbooks"] },
+    "description": "Integration specifications as enforceable contracts \u2014 explicit data mappings, sequence diagrams for happy AND error paths, retry policies with circuit breaker thresholds, SLA definitions with breach escalation, and monitoring that tracks integration health specifically. Error flows are required, not optional.",
+    "totalWordTarget": {
+      "min": 1800,
+      "max": 3500,
+      "excludes": [
+        "tables",
+        "diagrams",
+        "runbooks"
+      ]
+    },
     "qualityGate": {
       "description": "Pre-output checklist. Every item must pass before finalizing.",
       "checks": [
-        "Both Happy Path AND Error/Retry Path have sequence diagrams — error path is NOT optional",
+        "Both Happy Path AND Error/Retry Path have sequence diagrams \u2014 error path is NOT optional",
         "Error Handling table has retry policy details (max attempts, backoff type, circuit breaker threshold) for every scenario",
-        "Data Contract table has Transformation column filled — empty means 'nobody thought about this'",
+        "Data Contract table has Transformation column filled \u2014 empty means 'nobody thought about this'",
         "Monitoring table tracks integration-level metrics (message throughput, queue depth) not just system metrics (CPU, memory)",
-        "SLA table has Breach Escalation column filled — SLAs without escalation paths are aspirational, not enforceable",
-        "Every system in Systems & Endpoints has Auth Mechanism and Rate Limits filled"
+        "SLA table has Breach Escalation column filled \u2014 SLAs without escalation paths are aspirational, not enforceable",
+        "Every system in Systems & Endpoints has Auth Mechanism and Rate Limits filled",
+        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
-        "Data field mappings were preserved exactly — field names and types cannot be changed during refinement",
+        "Data field mappings were preserved exactly \u2014 field names and types cannot be changed during refinement",
         "Retry policies and circuit breaker thresholds were not removed or made vague",
-        "Sequence diagrams were not simplified to the point of losing error handling steps"
+        "Sequence diagrams were not simplified to the point of losing error handling steps",
+        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
+        "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
       ]
     },
     "progressiveDisclosure": {
-      "10_second_scan": ["Epic Status", "Objective"],
-      "2_minute_read": ["Integration Overview diagram", "Systems & Endpoints table", "SLA table"],
-      "full_read": ["all sections including sequence diagrams and error handling"]
+      "10_second_scan": [
+        "Epic Status",
+        "Objective"
+      ],
+      "2_minute_read": [
+        "Integration Overview diagram",
+        "Systems & Endpoints table",
+        "SLA table"
+      ],
+      "full_read": [
+        "all sections including sequence diagrams and error handling"
+      ]
     }
   }
 }
