@@ -1,0 +1,863 @@
+{
+  "_meta": {
+    "version": "2.1.0",
+    "description": "GitLab Epic documentation templates — optimized for progressive disclosure, visual scannability, and decision-forward structure. Inspired by Google Design Docs, Amazon 6-Pagers, and Stripe engineering practices.",
+    "outputFormat": "gitlab-flavored-markdown",
+    "changelog": {
+      "2.1.0": "Removed TL;DR (merged into Objective), removed manual TOC (GitLab handles natively), renamed 'Metadata Header' to 'Epic Status'"
+    },
+    "globalDefaults": {
+      "statusEmoji": {
+        "complete": "✅",
+        "in_progress": "🔄",
+        "pending": "⏳",
+        "blocked": "🚫",
+        "at_risk": "⚠️",
+        "not_started": "⬜"
+      },
+      "priorityLevels": {
+        "critical": "🔴",
+        "high": "🟠",
+        "medium": "🟡",
+        "low": "🟢"
+      },
+      "reviewStates": {
+        "approved": "✅",
+        "pending": "⏳",
+        "reviewing": "🔄",
+        "changes_requested": "🟠",
+        "rejected": "🔴"
+      },
+      "markdownFeatures": {
+        "alerts": ["[!note]", "[!tip]", "[!important]", "[!warning]", "[!caution]"],
+        "mermaidDiagrams": true,
+        "taskLists": true,
+        "collapsibleSections": true,
+        "inlineDiff": true,
+        "footnotes": true
+      }
+    }
+  },
+
+  "business_requirement": {
+    "requiredSections": {
+      "Epic Status": {
+        "wordLimit": 0,
+        "format": "table",
+        "fields": ["Status", "Owner", "Reviewers", "Target Release", "Epic Link", "Last Updated"],
+        "hint": "Use reviewer status emoji (✅ ⏳ 🔄) for instant review-state visibility"
+      },
+      "Objective": {
+        "target": 80,
+        "max": 150,
+        "hint": "What are we doing, why, and what's the expected business outcome? This is the first thing anyone reads — make it count."
+      },
+      "Business Context & Problem Statement": {
+        "target": 200,
+        "max": 400,
+        "hint": "Lead with data. What pain exists today? Quantify the cost of inaction."
+      },
+      "Business Objectives": {
+        "target": 100,
+        "max": 200,
+        "format": "bullet-list",
+        "hint": "SMART format — Specific, Measurable, Achievable, Relevant, Time-bound"
+      },
+      "Scope & Non-Scope": {
+        "target": 150,
+        "max": 300,
+        "hint": "Non-scope is equally important as scope. List what this initiative deliberately excludes and why."
+      },
+      "Stakeholders & RACI": {
+        "target": 0,
+        "max": 0,
+        "format": "raci-table",
+        "columns": ["Activity", "Responsible", "Accountable", "Consulted", "Informed"],
+        "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells."
+      },
+      "Requirements": {
+        "target": 200,
+        "max": 500,
+        "format": "priority-table",
+        "columns": ["ID", "Requirement", "Priority 🔴🟠🟡🟢", "Acceptance Criteria", "Owner"],
+        "hint": "Each requirement gets 30–80 words max. Use priority emoji for visual scanning."
+      },
+      "Success Metrics": {
+        "target": 100,
+        "max": 200,
+        "format": "metrics-table",
+        "columns": ["Metric", "Baseline (Current)", "Target", "Measurement Method", "Timeline"],
+        "hint": "Every metric must be quantified. 'Improve performance' is not a metric."
+      },
+      "Risk Assessment": {
+        "target": 0,
+        "max": 0,
+        "format": "risk-heat-map-and-register",
+        "heatMapDimensions": { "likelihood": ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"], "impact": ["Negligible", "Minor", "Moderate", "Major", "Severe"] },
+        "registerColumns": ["ID", "Risk", "Likelihood", "Impact", "Score", "Owner", "Mitigation"],
+        "hint": "Show 5×5 heat map first using colored emoji (🟢🟡🟠🔴), then detailed register table below."
+      },
+      "Next Steps & Decision Log": {
+        "target": 80,
+        "max": 150,
+        "format": "task-list-and-table",
+        "decisionLogColumns": ["ID", "Date", "Decision", "Status", "Decider", "Context"],
+        "hint": "Use GitLab task lists (- [ ]) for action items. Decision log captures key choices made."
+      }
+    },
+    "optionalSections": {
+      "Assumptions & Constraints": {
+        "target": 80,
+        "max": 200,
+        "collapsible": true
+      },
+      "Timeline & Milestones": {
+        "target": 0,
+        "max": 0,
+        "format": "milestone-table",
+        "columns": ["Milestone", "Target Date", "Status", "Owner", "Dependencies"],
+        "collapsible": false
+      },
+      "Budget & Cost-Benefit Analysis": {
+        "target": 100,
+        "max": 250,
+        "format": "cost-table",
+        "columns": ["Category", "One-Time Cost", "Recurring Cost", "Expected Benefit", "ROI Timeline"],
+        "collapsible": true
+      },
+      "Glossary": {
+        "target": 0,
+        "max": 0,
+        "format": "description-list",
+        "collapsible": true,
+        "hint": "Use GitLab description list syntax for clean term definitions"
+      }
+    },
+    "tone": "outcome-oriented, stakeholder-friendly",
+    "storyStyle": "business-narrative",
+    "architectureFocus": "high-level-strategic",
+    "expertRole": "senior business analyst",
+    "description": "Business requirements focusing on ROI, stakeholder value, strategic alignment, and measurable outcomes. Uses RACI matrices, risk heat maps, and SMART objectives.",
+    "totalWordTarget": { "min": 1500, "max": 2500, "excludes": ["tables", "appendices"] },
+    "progressiveDisclosure": {
+      "10_second_scan": ["Epic Status", "Objective"],
+      "2_minute_read": ["Business Objectives", "Scope & Non-Scope", "Success Metrics"],
+      "full_read": ["all sections"]
+    }
+  },
+
+  "technical_design": {
+    "requiredSections": {
+      "Epic Status": {
+        "wordLimit": 0,
+        "format": "table",
+        "fields": ["Status", "Owner", "Reviewers (with approval state)", "Target Release", "Epic Link", "Last Updated", "RFC Deadline"],
+        "hint": "Use Stripe-style gavel block — each reviewer gets status emoji showing approval state"
+      },
+      "Objective": {
+        "target": 80,
+        "max": 150,
+        "hint": "What are we building, why, and what's the key architectural decision? One paragraph that gives full context."
+      },
+      "Context & Motivation": {
+        "target": 200,
+        "max": 400,
+        "hint": "What problem does this solve? What triggered this work? Include links to relevant issues/epics."
+      },
+      "Goals & Non-Goals": {
+        "target": 100,
+        "max": 200,
+        "format": "two-column-bullets",
+        "hint": "NON-GOALS are the most important part. List things that could reasonably be goals but are deliberately excluded."
+      },
+      "Proposed Design": {
+        "target": 500,
+        "max": 1500,
+        "subsections": {
+          "Architecture Overview": {
+            "target": 200,
+            "max": 400,
+            "diagram": "mermaid-flowchart",
+            "hint": "Include a mermaid architecture diagram. The diagram IS the source of truth — no stale images."
+          },
+          "Data Model & Storage": {
+            "target": 100,
+            "max": 300,
+            "hint": "Schema definitions, storage choices, data lifecycle"
+          },
+          "API Contracts": {
+            "target": 100,
+            "max": 400,
+            "format": "code-blocks",
+            "hint": "Request/response examples in JSON code blocks. Use inline diff ({+ new +} / {- old -}) for changes."
+          },
+          "Key Algorithms & Logic": {
+            "target": 100,
+            "max": 300,
+            "hint": "Only for non-trivial logic. Skip if straightforward CRUD."
+          }
+        }
+      },
+      "Alternatives Considered": {
+        "target": 200,
+        "max": 600,
+        "format": "comparison-table-and-prose",
+        "columns": ["Option", "Pros", "Cons", "Why Rejected/Chosen"],
+        "hint": "⭐ THIS IS THE MOST IMPORTANT SECTION (per Google). Shows rigorous thinking. Each alternative gets 100–200 words."
+      },
+      "Cross-Cutting Concerns": {
+        "target": 200,
+        "max": 400,
+        "subsections": {
+          "Security & Privacy": { "target": 60, "max": 120 },
+          "Observability & Monitoring": { "target": 60, "max": 120 },
+          "Performance & Scalability": { "target": 60, "max": 120 },
+          "Accessibility": { "target": 30, "max": 60 }
+        }
+      },
+      "Implementation Plan": {
+        "target": 150,
+        "max": 400,
+        "format": "phase-table",
+        "columns": ["Phase", "Scope", "Duration", "Dependencies", "Deliverable"],
+        "hint": "Break into shippable increments. Each phase should deliver testable value."
+      },
+      "Risks & Mitigations": {
+        "target": 0,
+        "max": 0,
+        "format": "risk-register-table",
+        "columns": ["Risk", "Likelihood", "Impact", "Mitigation", "Owner"]
+      },
+      "Open Questions": {
+        "target": 50,
+        "max": 150,
+        "format": "task-list",
+        "hint": "Use GitLab task lists: - [ ] Question (@owner, due: date). Close as decisions are made."
+      }
+    },
+    "optionalSections": {
+      "Decision Log (ADRs)": {
+        "target": 0,
+        "max": 0,
+        "format": "adr-table",
+        "columns": ["ADR#", "Date", "Decision", "Status ✅🔄⛔", "Decider", "Link"],
+        "hint": "MADR format: Status → Context → Decision Drivers → Considered Options → Decision Outcome",
+        "collapsible": false
+      },
+      "Team & Roles": {
+        "target": 60,
+        "max": 120,
+        "format": "table",
+        "collapsible": true
+      },
+      "Definition of Done": {
+        "target": 60,
+        "max": 120,
+        "format": "checklist",
+        "collapsible": true,
+        "hint": "Use GitLab three-state task lists: [x] done, [ ] pending, [~] not applicable"
+      },
+      "Appendix": {
+        "target": 0,
+        "max": 0,
+        "collapsible": true,
+        "hint": "Extended analysis, raw data, detailed calculations. Use <details> tags."
+      }
+    },
+    "tone": "precise, trade-off-focused, decision-forward",
+    "storyStyle": "technical-narrative",
+    "architectureFocus": "detailed-components-with-alternatives",
+    "expertRole": "senior software architect",
+    "description": "Technical design documents following Google's design doc philosophy — context, goals/non-goals, proposed design, alternatives considered, and cross-cutting concerns. Emphasizes demonstrating rigorous thinking through explicit trade-off analysis.",
+    "totalWordTarget": { "min": 2000, "max": 4000, "excludes": ["tables", "code-blocks", "diagrams", "appendix"] },
+    "progressiveDisclosure": {
+      "10_second_scan": ["Epic Status", "Objective"],
+      "2_minute_read": ["Goals & Non-Goals", "Architecture Overview diagram", "Alternatives Considered table"],
+      "full_read": ["all sections"]
+    }
+  },
+
+  "feature_specification": {
+    "requiredSections": {
+      "Epic Status": {
+        "wordLimit": 0,
+        "format": "table",
+        "fields": ["Status", "Product Owner", "Tech Lead", "Designer", "Target Release", "Feature Flag", "Epic Link"]
+      },
+      "Objective": {
+        "target": 80,
+        "max": 150,
+        "hint": "What user problem are we solving, and how will we know we've solved it? Lead with the user impact."
+      },
+      "Problem Statement": {
+        "target": 100,
+        "max": 250,
+        "hint": "Lead with evidence — user research data, support ticket volume, funnel drop-off rates. Not assumptions."
+      },
+      "User Stories": {
+        "target": 100,
+        "max": 300,
+        "format": "story-list",
+        "titleFormat": "US-{nn}: {Short descriptive title, 3-6 words}",
+        "template": "**US-{nn}: {title}**\nAs a [persona], I want [action] so that [outcome]\n**Acceptance Criteria:** [testable criterion]",
+        "count": { "min": 3, "max": 7 },
+        "hint": "Each user story MUST begin with a bold, scannable title in the format 'US-01: One-Click Reorder' followed by the As a… statement. Titles should be unique, concise (3-6 words), and action-oriented. Each story must map to at least one testable acceptance criterion listed directly below it."
+      },
+      "Scope & Non-Scope": {
+        "target": 100,
+        "max": 250,
+        "hint": "Non-scope prevents scope creep. Be explicit about what's out for V1 and what's deferred to V2."
+      },
+      "Functional Requirements": {
+        "target": 0,
+        "max": 0,
+        "format": "requirements-table",
+        "columns": ["ID", "Requirement", "Priority 🔴🟠🟡🟢", "User Story Ref", "Acceptance Criteria"]
+      },
+      "User Flows": {
+        "target": 100,
+        "max": 300,
+        "diagram": "mermaid-flowchart",
+        "hint": "Include mermaid flowcharts for happy path AND key error paths. Don't just document the sunshine scenario."
+      },
+      "Edge Cases & Error Handling": {
+        "target": 80,
+        "max": 200,
+        "format": "table",
+        "columns": ["Scenario", "Expected Behavior", "Error Message/UX", "Priority"]
+      },
+      "Non-Functional Requirements": {
+        "target": 0,
+        "max": 0,
+        "format": "nfr-table",
+        "columns": ["Category", "Requirement", "Target", "Measurement"],
+        "hint": "Be specific: 'P99 latency < 200ms' not 'should be fast'"
+      },
+      "Analytics & Success Metrics": {
+        "target": 80,
+        "max": 200,
+        "format": "metrics-table",
+        "columns": ["Metric", "Baseline", "Target", "Tracking Method", "Review Date"]
+      },
+      "Launch Plan": {
+        "target": 80,
+        "max": 200,
+        "hint": "Feature flag strategy, rollout percentage plan, rollback criteria, A/B test design if applicable"
+      }
+    },
+    "optionalSections": {
+      "UX/Design": {
+        "target": 80,
+        "max": 200,
+        "hint": "Link to Figma/mockups. Describe key interaction patterns and accessibility requirements.",
+        "collapsible": false
+      },
+      "Assumptions": {
+        "target": 50,
+        "max": 120,
+        "collapsible": true
+      },
+      "Dependencies & Risks": {
+        "target": 0,
+        "max": 0,
+        "format": "risk-register-table",
+        "columns": ["Risk", "Likelihood", "Impact", "Mitigation", "Owner"],
+        "collapsible": false
+      },
+      "Competitive Analysis": {
+        "target": 80,
+        "max": 200,
+        "format": "comparison-table",
+        "collapsible": true,
+        "hint": "How do competitors solve this problem? What can we learn?"
+      }
+    },
+    "tone": "user-centric, evidence-driven",
+    "storyStyle": "feature-narrative",
+    "architectureFocus": "user-interaction-and-outcomes",
+    "expertRole": "senior product manager",
+    "description": "Feature specifications that bridge product and engineering — evidence-based problem statements, user stories with acceptance criteria, explicit edge cases, launch plans with rollback criteria, and measurable success metrics.",
+    "totalWordTarget": { "min": 1500, "max": 2500, "excludes": ["tables", "diagrams"] },
+    "progressiveDisclosure": {
+      "10_second_scan": ["Epic Status", "Objective"],
+      "2_minute_read": ["Problem Statement", "User Stories", "Success Metrics"],
+      "full_read": ["all sections"]
+    }
+  },
+
+  "api_specification": {
+    "requiredSections": {
+      "Epic Status": {
+        "wordLimit": 0,
+        "format": "table",
+        "fields": ["Status", "API Owner", "Reviewers", "API Version", "Base URL(s)", "Auth Method", "Last Updated"]
+      },
+      "Objective": {
+        "target": 80,
+        "max": 150,
+        "hint": "What does this API do, who consumes it, and what's the key design principle?"
+      },
+      "Overview & Authentication": {
+        "target": 150,
+        "max": 300,
+        "hint": "Base URLs per environment, auth mechanism (OAuth2/API key/JWT), token lifecycle, scopes/permissions"
+      },
+      "Resource Definitions": {
+        "target": 0,
+        "max": 0,
+        "format": "schema-table",
+        "columns": ["Field", "Type", "Required", "Description", "Constraints", "Example"],
+        "hint": "One table per resource. Include validation rules and constraints."
+      },
+      "Endpoints": {
+        "target": 200,
+        "max": 1500,
+        "format": "endpoint-blocks",
+        "perEndpoint": {
+          "structure": ["Method + Path", "Description", "Parameters (path/query/header)", "Request Body (JSON code block)", "Response 2xx (JSON code block)", "Error Responses (table)", "Example cURL"],
+          "wordLimit": { "target": 100, "max": 300 }
+        },
+        "hint": "Working examples are mandatory. Use diff code blocks ({+ new +} / {- old -}) for versioned changes."
+      },
+      "Error Handling": {
+        "target": 0,
+        "max": 0,
+        "format": "error-table",
+        "columns": ["HTTP Status", "Error Code", "Message", "Description", "Troubleshooting"],
+        "standardFormat": {
+          "example": "{ \"error\": { \"code\": \"RESOURCE_NOT_FOUND\", \"message\": \"...\", \"request_id\": \"...\" } }"
+        },
+        "hint": "Standardized error envelope. Include request_id for debugging. Group by category (auth, validation, server)."
+      },
+      "Pagination & Rate Limiting": {
+        "target": 80,
+        "max": 200,
+        "format": "specs-table",
+        "hint": "Exact numbers: requests/minute, burst limit, pagination cursor vs offset, max page size, rate limit headers"
+      },
+      "Webhooks & Events": {
+        "target": 100,
+        "max": 300,
+        "format": "event-table-and-schema",
+        "columns": ["Event", "Trigger", "Payload Schema", "Delivery Guarantee", "Retry Policy"],
+        "hint": "Include payload examples. Specify at-least-once vs at-most-once delivery. Document idempotency keys.",
+        "conditional": "Include only if API has event-driven components"
+      }
+    },
+    "optionalSections": {
+      "Versioning & Deprecation": {
+        "target": 80,
+        "max": 200,
+        "hint": "URL vs header versioning, backward compatibility guarantees, deprecation timeline, sunset headers",
+        "collapsible": false
+      },
+      "SDK & Code Examples": {
+        "target": 0,
+        "max": 0,
+        "format": "multi-language-code-blocks",
+        "languages": ["cURL", "Python", "JavaScript", "Go"],
+        "collapsible": true
+      },
+      "Changelog": {
+        "target": 0,
+        "max": 0,
+        "format": "changelog-table",
+        "columns": ["Version", "Date", "Change Type (Breaking/Feature/Fix)", "Description"],
+        "hint": "Use inline diff syntax for schema changes. Flag breaking changes with > [!caution] alerts.",
+        "collapsible": false
+      },
+      "Testing & Sandbox": {
+        "target": 60,
+        "max": 150,
+        "hint": "Sandbox URLs, test credentials, mock data, Postman collection link",
+        "collapsible": true
+      }
+    },
+    "tone": "developer-friendly, example-driven, precise",
+    "storyStyle": "api-reference",
+    "architectureFocus": "api-contract-and-flow",
+    "expertRole": "senior API architect",
+    "description": "API specifications modeled after Stripe's gold standard — working examples for every endpoint, standardized error envelopes, explicit rate limits, webhook delivery guarantees, and versioning strategy. Developer experience is the primary design constraint.",
+    "totalWordTarget": { "min": 2000, "max": 5000, "excludes": ["code-blocks", "tables", "schemas"] },
+    "progressiveDisclosure": {
+      "10_second_scan": ["Epic Status", "Objective"],
+      "2_minute_read": ["Overview & Authentication", "Resource Definitions"],
+      "full_read": ["all endpoints and schemas"]
+    }
+  },
+
+  "infrastructure_design": {
+    "requiredSections": {
+      "Epic Status": {
+        "wordLimit": 0,
+        "format": "table",
+        "fields": ["Status", "Owner", "Reviewers", "Target Environment", "Cloud Provider", "Last Updated", "RFC Deadline"]
+      },
+      "Objective": {
+        "target": 80,
+        "max": 150,
+        "hint": "What infrastructure are we building/changing, why, and what are the key SLA targets?"
+      },
+      "Business Context": {
+        "target": 80,
+        "max": 200,
+        "hint": "Why does the business need this infrastructure? What happens if we don't build it?"
+      },
+      "SLA/SLO Requirements": {
+        "target": 0,
+        "max": 0,
+        "format": "slo-table",
+        "columns": ["Metric (SLI)", "Current Value", "Target SLO", "Error Budget", "Measurement"],
+        "hint": "Availability, latency percentiles, throughput, error rate. Current vs target."
+      },
+      "Architecture Overview": {
+        "target": 300,
+        "max": 500,
+        "diagram": "mermaid-flowchart",
+        "hint": "Mermaid architecture diagram is mandatory. Show all services, data stores, network boundaries, and traffic flow."
+      },
+      "Component Design": {
+        "target": 200,
+        "max": 600,
+        "format": "per-component-subsections",
+        "perComponent": { "target": 80, "max": 200 },
+        "hint": "One subsection per major component: compute, storage, networking, CDN, queues, etc."
+      },
+      "Network & Security Architecture": {
+        "target": 150,
+        "max": 400,
+        "diagram": "mermaid-flowchart",
+        "subsections": {
+          "Network Topology": { "target": 60, "max": 150 },
+          "IAM & Access Controls": { "target": 50, "max": 120 },
+          "Encryption & Secrets Management": { "target": 50, "max": 120 }
+        }
+      },
+      "Environments & CI/CD": {
+        "target": 100,
+        "max": 250,
+        "format": "environment-table-and-pipeline",
+        "columns": ["Environment", "Purpose", "URL", "Deployment Method", "Approval Required"],
+        "hint": "Include pipeline diagram (mermaid) showing build → test → stage → prod flow"
+      },
+      "Observability": {
+        "target": 100,
+        "max": 300,
+        "subsections": {
+          "SLI Dashboards": { "target": 40, "max": 80 },
+          "Alerting Rules": {
+            "target": 0,
+            "max": 0,
+            "format": "alert-table",
+            "columns": ["Alert", "Condition", "Severity", "Notification Channel", "Runbook Link"]
+          },
+          "Logging Strategy": { "target": 40, "max": 80 }
+        }
+      },
+      "Disaster Recovery": {
+        "target": 150,
+        "max": 400,
+        "format": "dr-table-and-procedure",
+        "columns": ["Scenario", "RPO", "RTO", "Recovery Procedure", "Last Tested"],
+        "hint": "Include explicit RPO/RTO targets per failure scenario. When was the last DR drill?"
+      },
+      "Scaling Strategy": {
+        "target": 100,
+        "max": 250,
+        "format": "scaling-table",
+        "columns": ["Component", "Current Capacity", "Auto-Scale Trigger", "Max Scale", "Cost at Max"],
+        "hint": "Horizontal vs vertical. Auto-scaling policies. Include cost implications at scale."
+      },
+      "Cost Analysis": {
+        "target": 0,
+        "max": 0,
+        "format": "cost-table",
+        "columns": ["Service/Resource", "Spec", "Monthly Cost", "Annual Cost", "Notes"],
+        "hint": "Include current spend vs projected spend. Flag top 3 cost drivers."
+      }
+    },
+    "optionalSections": {
+      "Capacity Planning": {
+        "target": 0,
+        "max": 0,
+        "format": "projection-table",
+        "columns": ["Metric", "Current", "6 Months", "12 Months", "24 Months", "Action Required"],
+        "collapsible": false
+      },
+      "Decision Log (ADRs)": {
+        "target": 0,
+        "max": 0,
+        "format": "adr-table",
+        "columns": ["ADR#", "Date", "Decision", "Status ✅🔄⛔", "Decider", "Link"],
+        "collapsible": false
+      },
+      "Operational Runbooks": {
+        "target": 0,
+        "max": 0,
+        "format": "runbook-index",
+        "columns": ["Runbook", "Scenario", "Owner", "Last Reviewed", "Link"],
+        "collapsible": true,
+        "hint": "Index of runbooks with links. Detailed procedures live in separate docs."
+      },
+      "Migration/Cutover Plan": {
+        "target": 80,
+        "max": 200,
+        "collapsible": true,
+        "hint": "If this replaces existing infra, include cutover steps and rollback procedure"
+      }
+    },
+    "tone": "ops-focused, SLO-driven, cost-aware",
+    "storyStyle": "infrastructure-narrative",
+    "architectureFocus": "deployment-and-operations",
+    "expertRole": "senior DevOps/SRE engineer",
+    "description": "Infrastructure design documents emphasizing operational readiness — explicit SLA/SLO targets, cost analysis, disaster recovery with tested RPO/RTO, observability with alerting rules, and scaling strategies with cost implications. Every component must answer: how does it fail, how do we know, how do we recover?",
+    "totalWordTarget": { "min": 2500, "max": 4500, "excludes": ["tables", "diagrams", "runbooks"] },
+    "progressiveDisclosure": {
+      "10_second_scan": ["Epic Status", "Objective", "SLA/SLO Requirements table"],
+      "2_minute_read": ["Architecture Overview diagram", "Cost Analysis", "Disaster Recovery table"],
+      "full_read": ["all sections"]
+    }
+  },
+
+  "migration_plan": {
+    "requiredSections": {
+      "Epic Status": {
+        "wordLimit": 0,
+        "format": "table",
+        "fields": ["Status", "Migration Lead", "Reviewers", "Go/No-Go Date", "Rollback Deadline", "Epic Link", "War Room Channel"]
+      },
+      "Objective": {
+        "target": 80,
+        "max": 150,
+        "hint": "What are we migrating, from where to where, when, and what's the rollback window?"
+      },
+      "Current State": {
+        "target": 200,
+        "max": 400,
+        "diagram": "mermaid-flowchart",
+        "hint": "Architecture diagram of current system. Include known pain points, technical debt, and failure modes."
+      },
+      "Target State": {
+        "target": 200,
+        "max": 400,
+        "diagram": "mermaid-flowchart",
+        "hint": "Architecture diagram of target system. Highlight what changes and what stays the same."
+      },
+      "Migration Strategy": {
+        "target": 100,
+        "max": 300,
+        "hint": "Big-bang vs phased vs trickle. Lift-and-shift vs re-platform vs re-architect. Justify the choice."
+      },
+      "Scope & Non-Scope": {
+        "target": 80,
+        "max": 200,
+        "hint": "What's included in this migration phase? What's explicitly deferred?"
+      },
+      "RACI Matrix": {
+        "target": 0,
+        "max": 0,
+        "format": "raci-table",
+        "columns": ["Activity", "Responsible", "Accountable", "Consulted", "Informed"],
+        "hint": "Migration plans cross multiple teams. RACI eliminates 'I thought they were doing that' failures."
+      },
+      "Risk Assessment": {
+        "target": 0,
+        "max": 0,
+        "format": "risk-heat-map-and-register",
+        "heatMapDimensions": { "likelihood": ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"], "impact": ["Negligible", "Minor", "Moderate", "Major", "Severe"] },
+        "registerColumns": ["ID", "Risk", "Likelihood", "Impact", "Score", "Owner", "Mitigation", "Contingency"],
+        "hint": "⭐ HIGHEST-STAKES DOCUMENT TYPE. Risk assessment must be thorough. Include contingency plans, not just mitigations."
+      },
+      "Timeline & Milestones": {
+        "target": 0,
+        "max": 0,
+        "format": "milestone-table",
+        "columns": ["Phase", "Milestone", "Target Date", "Status", "Owner", "Go/No-Go Criteria"],
+        "diagram": "mermaid-gantt",
+        "hint": "Include Gantt chart via mermaid. Each milestone needs explicit go/no-go criteria."
+      },
+      "Cutover Plan": {
+        "target": 200,
+        "max": 600,
+        "format": "numbered-procedure",
+        "hint": "Step-by-step numbered procedure. Include time estimates per step, responsible person, and verification checks."
+      },
+      "Rollback Plan": {
+        "target": 150,
+        "max": 400,
+        "format": "numbered-procedure",
+        "alert": "[!caution]",
+        "hint": "Explicit triggers (what conditions activate rollback). Step-by-step procedure. Maximum rollback window. Data reconciliation steps."
+      },
+      "Testing & Validation Strategy": {
+        "target": 150,
+        "max": 400,
+        "subsections": {
+          "Pre-Migration Validation": { "target": 40, "max": 100 },
+          "Dry Run Plan": { "target": 60, "max": 150, "hint": "When, how many dry runs, success criteria" },
+          "Post-Migration Validation": { "target": 50, "max": 150, "format": "checklist" }
+        }
+      },
+      "Data Security & Compliance": {
+        "target": 80,
+        "max": 200,
+        "hint": "Data classification, encryption in transit/at rest, access controls during migration, audit trail, compliance requirements"
+      }
+    },
+    "optionalSections": {
+      "Communication Plan": {
+        "target": 0,
+        "max": 0,
+        "format": "comms-table",
+        "columns": ["Audience", "Channel", "Timing", "Content/Template", "Owner"],
+        "collapsible": false,
+        "hint": "Who needs to know what, when? Include customer-facing comms if applicable."
+      },
+      "Training Requirements": {
+        "target": 60,
+        "max": 150,
+        "collapsible": true
+      },
+      "Post-Migration Support Plan": {
+        "target": 60,
+        "max": 150,
+        "hint": "Hypercare period, escalation paths, known issues watchlist, performance monitoring period",
+        "collapsible": false
+      },
+      "Lessons Learned": {
+        "target": 0,
+        "max": 0,
+        "format": "table",
+        "columns": ["Item", "What Happened", "Impact", "Action for Next Time"],
+        "collapsible": true,
+        "hint": "Fill in post-migration. Template exists so it doesn't get forgotten."
+      }
+    },
+    "tone": "procedural, risk-aware, operationally precise",
+    "storyStyle": "migration-playbook",
+    "architectureFocus": "before-after-with-transition",
+    "expertRole": "senior migration specialist / SRE",
+    "description": "Migration plans as operational playbooks — current/target state architectures, explicit RACI ownership, risk heat maps with contingency plans, step-by-step cutover and rollback procedures, dry run plans, and communication matrices. Designed for the highest-stakes document type in engineering.",
+    "totalWordTarget": { "min": 2500, "max": 4000, "excludes": ["tables", "diagrams", "checklists"] },
+    "progressiveDisclosure": {
+      "10_second_scan": ["Epic Status", "Objective"],
+      "2_minute_read": ["Current State diagram", "Target State diagram", "Timeline & Milestones", "Risk heat map"],
+      "full_read": ["all sections including Cutover and Rollback procedures"]
+    }
+  },
+
+  "integration_spec": {
+    "requiredSections": {
+      "Epic Status": {
+        "wordLimit": 0,
+        "format": "table",
+        "fields": ["Status", "Integration Owner", "Source System Owner", "Target System Owner", "Reviewers", "Last Updated"]
+      },
+      "Objective": {
+        "target": 80,
+        "max": 150,
+        "hint": "What systems are being integrated, what data flows between them, and what's the SLA?"
+      },
+      "Integration Overview": {
+        "target": 100,
+        "max": 200,
+        "diagram": "mermaid-context-diagram",
+        "hint": "System context diagram showing all participating systems, direction of data flow, and integration pattern (sync/async/event)."
+      },
+      "Systems & Endpoints": {
+        "target": 0,
+        "max": 0,
+        "format": "system-table",
+        "columns": ["System", "Owner Team", "Base URL", "Auth Mechanism", "Rate Limits", "SLA"]
+      },
+      "Data Contract & Mappings": {
+        "target": 100,
+        "max": 300,
+        "format": "mapping-table",
+        "columns": ["Source Field", "Source Type", "Target Field", "Target Type", "Transformation", "Required", "Notes"],
+        "hint": "Include schema validation rules. Use inline diff for contract changes."
+      },
+      "Integration Flows": {
+        "target": 150,
+        "max": 400,
+        "diagram": "mermaid-sequence",
+        "subsections": {
+          "Happy Path": { "diagram": "mermaid-sequence", "required": true },
+          "Error / Retry Path": { "diagram": "mermaid-sequence", "required": true, "hint": "DO NOT SKIP. Error flows are where integrations actually fail." },
+          "Recovery / Reconciliation Path": { "diagram": "mermaid-sequence", "required": false }
+        }
+      },
+      "Error Handling & Recovery": {
+        "target": 150,
+        "max": 300,
+        "format": "error-strategy-table",
+        "columns": ["Error Scenario", "Detection", "Retry Policy", "Dead Letter Queue", "Alert", "Manual Intervention"],
+        "hint": "Retry policies: max attempts, backoff strategy (exponential/linear), circuit breaker thresholds."
+      },
+      "Security & Data Privacy": {
+        "target": 100,
+        "max": 250,
+        "subsections": {
+          "Authentication & Authorization": { "target": 40, "max": 80 },
+          "Data Classification & PII": { "target": 30, "max": 80 },
+          "Encryption": { "target": 30, "max": 60 }
+        }
+      },
+      "Monitoring & Alerting": {
+        "target": 0,
+        "max": 0,
+        "format": "monitoring-table",
+        "columns": ["Metric/SLI", "Threshold", "Alert Severity", "Notification", "Runbook"],
+        "hint": "Monitor integration health, not just system health. Track: message throughput, error rate, latency, queue depth."
+      },
+      "Performance & SLAs": {
+        "target": 0,
+        "max": 0,
+        "format": "sla-table",
+        "columns": ["Metric", "Requirement", "Measurement Method", "Breach Escalation"]
+      }
+    },
+    "optionalSections": {
+      "Versioning & Backward Compatibility": {
+        "target": 60,
+        "max": 150,
+        "hint": "How are breaking changes handled across system boundaries? Contract versioning strategy.",
+        "collapsible": false
+      },
+      "Testing Strategy": {
+        "target": 80,
+        "max": 200,
+        "subsections": {
+          "Contract Testing": { "target": 30, "max": 60 },
+          "Integration Testing": { "target": 30, "max": 60 },
+          "Mock Services": { "target": 20, "max": 60 }
+        },
+        "collapsible": false
+      },
+      "Fallback & Degradation": {
+        "target": 60,
+        "max": 150,
+        "hint": "What happens when the integration is down? Graceful degradation strategy, cached responses, circuit breakers.",
+        "collapsible": false
+      },
+      "Operational Runbook": {
+        "target": 0,
+        "max": 0,
+        "format": "runbook-procedures",
+        "collapsible": true,
+        "hint": "Troubleshooting guide: common failures, diagnostic steps, resolution procedures. Wrap in <details> tags."
+      }
+    },
+    "tone": "contract-precise, operationally thorough",
+    "storyStyle": "integration-contract",
+    "architectureFocus": "sequence-and-error-flows",
+    "expertRole": "senior integration architect",
+    "description": "Integration specifications as enforceable contracts — explicit data mappings, sequence diagrams for happy AND error paths, retry policies with circuit breaker thresholds, SLA definitions with breach escalation, and monitoring that tracks integration health specifically. Error flows are required, not optional.",
+    "totalWordTarget": { "min": 1800, "max": 3500, "excludes": ["tables", "diagrams", "runbooks"] },
+    "progressiveDisclosure": {
+      "10_second_scan": ["Epic Status", "Objective"],
+      "2_minute_read": ["Integration Overview diagram", "Systems & Endpoints table", "SLA table"],
+      "full_read": ["all sections including sequence diagrams and error handling"]
+    }
+  }
+}
