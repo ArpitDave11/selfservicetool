@@ -1,37 +1,17 @@
 {
   "_meta": {
-    "version": "2.1.3",
+    "version": "2.1.5",
     "description": "GitLab Epic documentation templates \u2014 optimized for progressive disclosure, visual scannability, and decision-forward structure. Inspired by Google Design Docs, Amazon 6-Pagers, and Stripe engineering practices.",
     "outputFormat": "gitlab-flavored-markdown",
     "changelog": {
       "2.1.0": "Removed TL;DR (merged into Objective), removed manual TOC (GitLab handles natively), renamed 'Metadata Header' to 'Epic Status'",
       "2.1.1": "Additive-only improvements: added titleFormat to User Stories, added hints/examples to underspecified sections, added mermaidDefaults/wordLimitConventions/collapsibleDefault/traceability to globalDefaults, standardized RACI and Risk hints, added categoryEnum to NFRs, added riskLevel field, added conditional to applicable sections",
       "2.1.2": "Added refinementMode, qualityRules, wordTargetInterpretation, and antiPatterns to globalDefaults. Added qualityGate to each template. Refinement now prioritizes density over length \u2014 tighten, don't expand.",
-      "2.1.3": "Fixed: epic title generation (added epicTitle guidance), date duplication on refine (added refinementFieldBehavior), diagram duplication on refine (added existingContentDetection to refinementMode), mermaid rendering reliability (replaced rigid rules with mermaidCraft coaching guidance)"
+      "2.1.3": "Fixed: date duplication on refine (added refinementFieldBehavior), diagram duplication on refine (added existingContentDetection to refinementMode), mermaid rendering reliability (replaced rigid rules with mermaidCraft coaching guidance)",
+      "2.1.4": "Removed epicTitle (handled by application layer). Removed title-related qualityGate checks. Template now focuses purely on content quality \u2014 title extraction is the app's responsibility.",
+      "2.1.5": "Added linkStyle/index mismatch guidance to mermaidCraft.commonRenderingPitfalls. Added selfValidation section to mermaidCraft for pre-output diagram consistency checks. Updated qualityGate refinement checks for link-style alignment."
     },
     "globalDefaults": {
-      "epicTitle": {
-        "description": "The epic title is the H1 heading that appears BEFORE the table of contents. It is the name of the initiative \u2014 not a summary, not a sentence, not the Objective rephrased.",
-        "format": "Short noun phrase. 3-8 words. Title case. No periods.",
-        "guidance": "Think of it as what you'd name a Jira epic or a project folder. It should be instantly recognizable in a list of 50 other epics. A good title is specific enough that two people on the same team wouldn't confuse it with another project.",
-        "examples": {
-          "good": [
-            "Vendor Onboarding Portal V2",
-            "Kafka Migration: Order Pipeline",
-            "Partner API v3 Specification",
-            "Multi-Region DR for Payments Service",
-            "Checkout Address Autocomplete"
-          ],
-          "bad": [
-            "This epic covers the design and implementation of a new vendor onboarding portal to replace the existing manual process",
-            "Technical Design Document for Migration",
-            "New Feature Implementation Plan",
-            "Epic for Q3 Infrastructure Work",
-            "Improving the System Performance and Reliability of Our Platform"
-          ]
-        },
-        "refinementBehavior": "If the existing epic already has a title, preserve it exactly unless the user explicitly asks to change it. Never replace a clear project name with a generated summary sentence."
-      },
       "statusEmoji": {
         "complete": "\u2705",
         "in_progress": "\ud83d\udd04",
@@ -108,7 +88,8 @@
           "edgeLabels": "Edge labels (the text on arrows) fail more often than node labels. Keep them to 2-3 words maximum. 'sends order' works. 'sends order data via async message queue' will likely break. If the interaction needs that much explanation, add a footnote below the diagram.",
           "subgraphNesting": "One level of subgraph grouping works reliably. Two levels usually works. Three levels is where things start breaking unpredictably. If you need three levels of nesting, your diagram is too complex \u2014 split into multiple diagrams.",
           "sequenceDiagramNotes": "Notes in sequence diagrams are fragile. 'Note over' and 'Note right of' work, but long note text or notes spanning many participants often break. Keep notes very short or skip them and explain in prose.",
-          "ganttDateFormats": "Gantt charts are strict about date formats. Stick to YYYY-MM-DD. Relative dates ('after task1') work but get confusing in complex charts."
+          "ganttDateFormats": "Gantt charts are strict about date formats. Stick to YYYY-MM-DD. Relative dates ('after task1') work but get confusing in complex charts.",
+          "linkStyleMismatch": "One of the most frequent rendering killers \u2014 and hardest to spot. It happens when you define connections (links/edges) between nodes and then apply linkStyle declarations to style those edges, but the indices don't match. Mermaid assigns link indices starting at 0, in the order they appear in the code. If you have 16 links (indices 0\u201315) but your linkStyle declarations reference indices 0\u201317, the diagram breaks silently or throws an error. This typically happens when you add or remove connections during editing but forget to update the style declarations, or when you copy-paste from another diagram that had a different number of links. The fix is simple but requires discipline: count your actual links first, then ensure every linkStyle index falls within that range. If you have N links, valid indices are 0 through N-1. No exceptions."
         },
         "buildingReliableDiagrams": {
           "approach": "Build incrementally, not all at once. Start with 3-4 nodes and the core relationship. Verify the pattern works in your head. Then add complexity one layer at a time. If you're generating a 20-node diagram in one shot, you're probably going to hit a rendering issue.",
@@ -119,6 +100,30 @@
         "whenDiagramsGoWrong": {
           "description": "If a diagram is failing to render, the instinct is to fix the syntax. Often the better move is to simplify the diagram. A diagram that's failing is usually too complex.",
           "recoveryApproach": "Strip back to the 3-4 most important nodes. Get that rendering. Then add back elements one at a time. This is faster than debugging a complex diagram."
+        },
+        "selfValidation": {
+          "description": "Before outputting any mermaid diagram, walk through these consistency checks mentally. Think of it like a compiler pass \u2014 catch the mismatches before the renderer does.",
+          "checks": {
+            "linkStyleAlignment": {
+              "what": "Every linkStyle index must correspond to an actual link/edge in the diagram.",
+              "how": "Count the total number of connections (arrows/edges) in the diagram \u2014 each A-->B, A---B, A-.->B etc. is one link, indexed from 0 in the order they appear in the code. If you have N links, valid linkStyle indices are 0 to N-1. Any linkStyle referencing index N or higher will break the diagram.",
+              "commonTrap": "When editing an existing diagram, you add or remove a connection but the linkStyle block was written for the old link count. Always recount after editing.",
+              "recommendation": "If styling is not critical to understanding the diagram, consider dropping linkStyle declarations entirely. An unstyled diagram that renders is always better than a styled one that breaks. Only add linkStyle when color-coding conveys meaning (e.g., red for error paths, green for happy paths)."
+            },
+            "nodeReferenceIntegrity": {
+              "what": "Every node ID used in a connection must be defined somewhere in the diagram.",
+              "how": "If an edge says A-->B, both A and B must exist as defined nodes. Typos in node IDs (svc1 vs srv1, DB vs Db) are silent failures \u2014 the renderer creates phantom nodes instead of throwing an error, producing a confusing diagram with orphan boxes."
+            },
+            "subgraphClosure": {
+              "what": "Every 'subgraph' must have a matching 'end'.",
+              "how": "Count subgraph declarations and end statements \u2014 they must be equal. A missing 'end' will break everything below it."
+            },
+            "classDef-classAlignment": {
+              "what": "Every class applied to a node must have a matching classDef.",
+              "how": "If you write 'class A errorStyle', there must be a 'classDef errorStyle ...' declaration. Undefined classes silently produce unstyled nodes, which is confusing but doesn't break rendering \u2014 however, it means your styling intent was lost."
+            }
+          },
+          "mentalModel": "Think of it as three counts that must reconcile: (1) number of links = valid range for linkStyle indices, (2) set of node IDs used in connections = subset of defined nodes, (3) set of class names applied = subset of classDef names. If any of these are out of sync, fix them before outputting."
         }
       },
       "raciRules": {
@@ -494,16 +499,16 @@
         "Risk Assessment has at least 3 risks \u2014 if fewer, the analysis is superficial",
         "No section restates the Objective in different words",
         "RACI table has exactly one A (Accountable) per row",
-        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
+        "Mermaid diagrams pass self-validation: linkStyle indices align with actual link count (N links = indices 0 to N-1), all node IDs in connections are defined, all subgraphs are closed, all applied classes have matching classDefs"
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input \u2014 if longer, justify every added sentence",
         "No new filler phrases were introduced (check antiPatterns list)",
         "All specific numbers, dates, and names from the original are preserved",
         "Vague statements were replaced with specific ones, not just reworded",
-        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
         "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
-        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)",
+        "If existing diagram was edited (links added/removed), linkStyle indices were recounted and realigned \u2014 never carry over old style indices after changing connections"
       ]
     },
     "progressiveDisclosure": {
@@ -713,16 +718,16 @@
         "Every API contract has a working JSON request/response example",
         "No section opens with 'This section describes...' or 'In this section we will...'",
         "Cross-Cutting Concerns contain project-specific details, not generic advice",
-        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
+        "Mermaid diagrams pass self-validation: linkStyle indices align with actual link count (N links = indices 0 to N-1), all node IDs in connections are defined, all subgraphs are closed, all applied classes have matching classDefs"
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "Technical details were not moved into Business Context or Objective",
         "Trade-off analysis in Alternatives Considered was preserved or strengthened, not diluted",
         "No new throat-clearing phrases ('It is important to note...') were introduced",
-        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
         "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
-        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)",
+        "If existing diagram was edited (links added/removed), linkStyle indices were recounted and realigned \u2014 never carry over old style indices after changing connections"
       ]
     },
     "progressiveDisclosure": {
@@ -913,16 +918,16 @@
         "Non-Functional Requirements use specific numbers ('P99 < 200ms') not adjectives ('fast', 'responsive')",
         "Launch Plan includes explicit rollback criteria \u2014 not just rollout steps",
         "No section contains generic filler like 'ensure a good user experience'",
-        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
+        "Mermaid diagrams pass self-validation: linkStyle indices align with actual link count (N links = indices 0 to N-1), all node IDs in connections are defined, all subgraphs are closed, all applied classes have matching classDefs"
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "User Story titles were not removed or made generic during refinement",
         "Acceptance Criteria from original were preserved \u2014 not dropped or made vaguer",
         "No new bullet points were added that fail the 'applies to every project' test",
-        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
         "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
-        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)",
+        "If existing diagram was edited (links added/removed), linkStyle indices were recounted and realigned \u2014 never carry over old style indices after changing connections"
       ]
     },
     "progressiveDisclosure": {
@@ -1101,16 +1106,16 @@
         "Rate limits are exact numbers, not 'reasonable limits' or 'subject to change'",
         "Resource schema tables have Example column filled for every field \u2014 no empty cells",
         "Authentication section specifies token lifetime and refresh mechanism",
-        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
+        "Mermaid diagrams pass self-validation: linkStyle indices align with actual link count (N links = indices 0 to N-1), all node IDs in connections are defined, all subgraphs are closed, all applied classes have matching classDefs"
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "No working code examples were removed or broken during refinement",
         "Endpoint paths and HTTP methods were not changed unless explicitly requested",
         "Schema field names and types were preserved exactly",
-        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
         "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
-        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)",
+        "If existing diagram was edited (links added/removed), linkStyle indices were recounted and realigned \u2014 never carry over old style indices after changing connections"
       ]
     },
     "progressiveDisclosure": {
@@ -1354,16 +1359,16 @@
         "Cost Analysis flags the top 3 cost drivers explicitly",
         "Scaling Strategy includes cost-at-max for every component \u2014 scaling without cost awareness is dangerous",
         "Architecture diagram matches the Component Design sections \u2014 no orphan components in either",
-        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
+        "Mermaid diagrams pass self-validation: linkStyle indices align with actual link count (N links = indices 0 to N-1), all node IDs in connections are defined, all subgraphs are closed, all applied classes have matching classDefs"
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "Specific cost figures, SLO numbers, and capacity numbers were preserved exactly",
         "No alerting rules or runbook links were removed",
         "Generic statements like 'follow security best practices' were replaced with specifics, not just kept",
-        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
         "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
-        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)",
+        "If existing diagram was edited (links added/removed), linkStyle indices were recounted and realigned \u2014 never carry over old style indices after changing connections"
       ]
     },
     "progressiveDisclosure": {
@@ -1590,16 +1595,16 @@
         "Dry Run Plan specifies how many dry runs and success criteria for each",
         "RACI Matrix has exactly one A per row and covers at least: cutover, rollback, communication, validation",
         "Every milestone in Timeline has Go/No-Go criteria \u2014 milestones without criteria are just dates",
-        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
+        "Mermaid diagrams pass self-validation: linkStyle indices align with actual link count (N links = indices 0 to N-1), all node IDs in connections are defined, all subgraphs are closed, all applied classes have matching classDefs"
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "No steps were removed from Cutover or Rollback procedures \u2014 steps can be reworded but not dropped",
         "Time estimates, dates, and rollback windows were preserved exactly",
         "Risk contingency plans were not downgraded to generic mitigations",
-        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
         "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
-        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)",
+        "If existing diagram was edited (links added/removed), linkStyle indices were recounted and realigned \u2014 never carry over old style indices after changing connections"
       ]
     },
     "progressiveDisclosure": {
@@ -1816,16 +1821,16 @@
         "Monitoring table tracks integration-level metrics (message throughput, queue depth) not just system metrics (CPU, memory)",
         "SLA table has Breach Escalation column filled \u2014 SLAs without escalation paths are aspirational, not enforceable",
         "Every system in Systems & Endpoints has Auth Mechanism and Rate Limits filled",
-        "Epic title is a short noun phrase (3-8 words, title case, no period) \u2014 not a summary sentence. See epicTitle guidance."
+        "Mermaid diagrams pass self-validation: linkStyle indices align with actual link count (N links = indices 0 to N-1), all node IDs in connections are defined, all subgraphs are closed, all applied classes have matching classDefs"
       ],
       "refinementSpecific": [
         "Output is same length or shorter than input",
         "Data field mappings were preserved exactly \u2014 field names and types cannot be changed during refinement",
         "Retry policies and circuit breaker thresholds were not removed or made vague",
         "Sequence diagrams were not simplified to the point of losing error handling steps",
-        "Epic title preserved exactly \u2014 not replaced with a generated summary sentence",
         "'Generated on' / 'Last Updated' date appears exactly ONCE in the Epic Status table \u2014 existing date updated in place, not duplicated",
-        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)"
+        "Existing mermaid diagrams updated in place \u2014 no section has duplicate diagrams unless the template explicitly requires multiple (e.g. current-state vs target-state)",
+        "If existing diagram was edited (links added/removed), linkStyle indices were recounted and realigned \u2014 never carry over old style indices after changing connections"
       ]
     },
     "progressiveDisclosure": {
