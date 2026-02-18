@@ -1,10 +1,12 @@
 {
   "_meta": {
-    "version": "2.1.0",
+    "version": "2.1.2",
     "description": "GitLab Epic documentation templates — optimized for progressive disclosure, visual scannability, and decision-forward structure. Inspired by Google Design Docs, Amazon 6-Pagers, and Stripe engineering practices.",
     "outputFormat": "gitlab-flavored-markdown",
     "changelog": {
-      "2.1.0": "Removed TL;DR (merged into Objective), removed manual TOC (GitLab handles natively), renamed 'Metadata Header' to 'Epic Status'"
+      "2.1.0": "Removed TL;DR (merged into Objective), removed manual TOC (GitLab handles natively), renamed 'Metadata Header' to 'Epic Status'",
+      "2.1.1": "Additive-only improvements: added titleFormat to User Stories, added hints/examples to underspecified sections, added mermaidDefaults/wordLimitConventions/collapsibleDefault/traceability to globalDefaults, standardized RACI and Risk hints, added categoryEnum to NFRs, added riskLevel field, added conditional to applicable sections",
+      "2.1.2": "Added refinementMode, qualityRules, wordTargetInterpretation, and antiPatterns to globalDefaults. Added qualityGate to each template. Refinement now prioritizes density over length — tighten, don't expand."
     },
     "globalDefaults": {
       "statusEmoji": {
@@ -35,6 +37,169 @@
         "collapsibleSections": true,
         "inlineDiff": true,
         "footnotes": true
+      },
+      "wordLimitConventions": {
+        "zeroMeaning": "When target and max are both 0, the section is table-only or diagram-only — no prose word limit applies",
+        "nullMeaning": "Section intentionally has no word count constraint"
+      },
+      "collapsibleDefault": {
+        "requiredSections": false,
+        "optionalSections": true
+      },
+      "wordCountExclusions": ["tables", "code-blocks", "diagrams", "checklists", "appendices"],
+      "mermaidDefaults": {
+        "maxNodes": 15,
+        "maxSequenceParticipants": 8,
+        "namingConvention": "PascalCase short names, full names in node labels",
+        "preferredDirection": {
+          "flowchart": "LR",
+          "sequence": "TB",
+          "gantt": "LR"
+        },
+        "hint": "Optimize for readability at 1200px width. Group related nodes with subgraphs. Keep labels concise (3-5 words max per node)."
+      },
+      "raciRules": {
+        "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells. If someone is both R and A, mark as R/A in bold.",
+        "validation": "Exactly one A per row is mandatory"
+      },
+      "riskLevels": {
+        "full": "Heat map (5×5 with colored emoji) + detailed register table + contingency column",
+        "standard": "Register table with columns: Risk, Likelihood, Impact, Mitigation, Owner",
+        "light": "Simple risk table without heat map or scoring"
+      },
+      "traceability": {
+        "description": "Cross-reference map showing how IDs trace across template types in a project pipeline",
+        "links": {
+          "business_requirement.Requirements.ID": "feature_specification.Functional Requirements.User Story Ref",
+          "feature_specification.User Stories.ID": "feature_specification.Functional Requirements.User Story Ref",
+          "feature_specification.Functional Requirements.ID": "technical_design.Context & Motivation"
+        }
+      },
+      "wordTargetInterpretation": {
+        "target": "IDEAL word count — the sweet spot. NOT a minimum to pad towards. Content that says everything needed in fewer words is BETTER, not worse.",
+        "max": "Hard ceiling. Never exceed. But hitting max usually means the section is bloated.",
+        "sweetSpot": "60-85% of target is often the quality zone. Hitting exactly target usually means filler was added.",
+        "rule": "If the existing content already covers all required points below the target, DO NOT add words to reach the target. Shorter + complete > longer + padded."
+      },
+      "refinementMode": {
+        "description": "Rules that apply when refining/editing an existing epic, NOT generating from scratch.",
+        "corePrinciple": "Refinement means TIGHTEN, not EXPAND. The goal is to increase information density — more signal per sentence, fewer total sentences.",
+        "operations": {
+          "cut": {
+            "priority": 1,
+            "description": "Remove filler, redundancy, weasel words, and content that restates what's already said elsewhere. This is the #1 refinement action.",
+            "targets": [
+              "Sentences that restate the Objective inside other sections",
+              "Transitional phrases that add no information ('It is important to note that...', 'As mentioned above...')",
+              "Hedging language ('It should be noted that...', 'We believe that...', 'It is worth considering...')",
+              "Duplicate information across sections",
+              "Generic statements that apply to any project ('Testing is important', 'Security must be considered')",
+              "Bullet points that say the same thing in different words"
+            ]
+          },
+          "sharpen": {
+            "priority": 2,
+            "description": "Replace vague statements with specific, quantified, actionable ones.",
+            "examples": [
+              { "before": "Improve system performance significantly", "after": "Reduce P99 latency from 1200ms to <300ms" },
+              { "before": "Ensure proper security measures are in place", "after": "TLS 1.3 for transit, AES-256 at rest, IAM roles scoped to least-privilege" },
+              { "before": "The system should handle increased load", "after": "Auto-scale from 3 to 12 pods at 70% CPU, supporting 10K→50K RPM" },
+              { "before": "Users should have a good experience", "after": "Checkout completion in <90s, zero full-page reloads, WCAG 2.1 AA compliant" }
+            ]
+          },
+          "restructure": {
+            "priority": 3,
+            "description": "Move misplaced content to the correct section. Do NOT duplicate — move.",
+            "rule": "If technical details appear in Business Context, move them to Proposed Design. If business justification appears in Implementation Plan, move it to Business Context. Each section should contain ONLY what its hint describes."
+          },
+          "preserve": {
+            "priority": 0,
+            "description": "NEVER discard during refinement",
+            "protected": [
+              "Specific numbers, dates, dollar amounts, and quantified metrics",
+              "Named owners, assignees, and stakeholders",
+              "Decision rationale and trade-off reasoning",
+              "Links to external resources (Figma, Jira, docs)",
+              "Acceptance criteria and success metrics",
+              "Risk mitigations with specific actions"
+            ]
+          }
+        },
+        "lengthRules": {
+          "existingShorterThanTarget": "If existing content is shorter than target but covers all required points completely, DO NOT pad it. Mark as complete.",
+          "existingLongerThanMax": "If existing content exceeds max, CUT to bring within max. Prioritize cutting filler over cutting substance.",
+          "existingAtTarget": "If existing content is near target, focus on SHARPENING (replace vague with specific) not expanding.",
+          "defaultBehavior": "Refinement should produce output that is the SAME length or SHORTER than input. If output is longer than input, justify every added sentence."
+        },
+        "outputLengthCheck": "After refinement, compare output word count to input word count. If output is >10% longer than input, re-examine and cut. Refinement that makes things longer has failed."
+      },
+      "qualityRules": {
+        "description": "Quality criteria that apply to ALL sections in ALL templates, for both generation and refinement.",
+        "sentenceLevelRules": [
+          "Every sentence must pass the 'so what?' test — if you remove it and nothing is lost, it shouldn't exist",
+          "No sentence should begin with 'It is important to...', 'It should be noted that...', 'We need to ensure that...', or similar throat-clearing",
+          "Prefer active voice: 'The service processes 10K requests/min' not 'Requests are processed by the service at a rate of 10K/min'",
+          "Lead with the specific, follow with the context — not the other way around",
+          "One idea per sentence. If a sentence has 'and' connecting two unrelated points, split it or cut one"
+        ],
+        "sectionLevelRules": [
+          "No section should repeat information from another section. If two sections say the same thing, one is wrong.",
+          "Every section must add NEW information not available in any other section",
+          "Tables should not have prose preambles that restate what the table shows — let the table speak",
+          "If a section only contains generic advice that applies to any project, it's empty. Fill it with project-specific content or remove it."
+        ],
+        "documentLevelRules": [
+          "The Objective section should be sufficient for a reader to decide if they need to read more. If it isn't, fix it first.",
+          "A reader at the '2_minute_read' progressive disclosure level should understand the full scope, key decisions, and risks. If they can't, the document structure is wrong.",
+          "Consistency: same terminology throughout. If it's called 'order-service' in one place, don't call it 'OrderService' or 'the ordering module' elsewhere."
+        ]
+      },
+      "antiPatterns": {
+        "description": "Common LLM output patterns that indicate low quality. These should be actively detected and eliminated.",
+        "patterns": [
+          {
+            "name": "Echo Padding",
+            "description": "Restating the Objective or Problem Statement inside other sections using slightly different words",
+            "detection": "If any section's opening sentence could be swapped with the Objective and no one would notice, it's echo padding",
+            "fix": "Delete the restated content. Start the section with its own unique first point."
+          },
+          {
+            "name": "Filler Bullets",
+            "description": "Bullet points that state obvious truths: 'Ensure high availability', 'Follow security best practices', 'Maintain code quality'",
+            "detection": "If a bullet applies to literally every software project ever built, it's filler",
+            "fix": "Replace with project-specific measurable statement or delete entirely"
+          },
+          {
+            "name": "Hedge Stacking",
+            "description": "Multiple hedging qualifiers: 'We should potentially consider possibly exploring the option of...'",
+            "detection": "More than one hedge word per sentence",
+            "fix": "Make a direct statement or flag it as an Open Question"
+          },
+          {
+            "name": "Premature Elaboration",
+            "description": "Explaining concepts the audience already knows: 'Kubernetes, which is a container orchestration platform...'",
+            "detection": "Inline definitions of terms the target audience uses daily",
+            "fix": "If the term needs explanation, put it in the Glossary. Otherwise, just use the term."
+          },
+          {
+            "name": "Table Narration",
+            "description": "Prose paragraphs that describe what a table already shows: 'As shown in the table below, Risk-001 has a likelihood of...'",
+            "detection": "Prose that could be deleted and the table still conveys full meaning",
+            "fix": "Delete the narration. Add a one-line summary only if it highlights a non-obvious insight."
+          },
+          {
+            "name": "Section Filler",
+            "description": "Generic opening/closing sentences in every section: 'This section describes...', 'In summary, this section covered...'",
+            "detection": "First or last sentence of a section that could apply to any document",
+            "fix": "Delete entirely. Start with the first substantive point. End with the last substantive point."
+          },
+          {
+            "name": "Symmetric Padding",
+            "description": "Making all bullet lists the same length by adding weak items to short lists",
+            "detection": "A list where the last 1-2 items are noticeably more vague or generic than the first items",
+            "fix": "3 strong bullets > 6 bullets where half are filler. Cut the weak ones."
+          }
+        ]
       }
     }
   },
@@ -50,7 +215,8 @@
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What are we doing, why, and what's the expected business outcome? This is the first thing anyone reads — make it count."
+        "hint": "What are we doing, why, and what's the expected business outcome? This is the first thing anyone reads — make it count.",
+        "example": "Implement an automated vendor onboarding portal to reduce average vendor setup time from 14 days to 2 days, eliminating $320K/year in manual processing costs and unblocking the procurement team's Q3 scale targets."
       },
       "Business Context & Problem Statement": {
         "target": 200,
@@ -73,14 +239,14 @@
         "max": 0,
         "format": "raci-table",
         "columns": ["Activity", "Responsible", "Accountable", "Consulted", "Informed"],
-        "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells."
+        "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells. If someone is both R and A, mark as R/A in bold."
       },
       "Requirements": {
         "target": 200,
         "max": 500,
         "format": "priority-table",
         "columns": ["ID", "Requirement", "Priority 🔴🟠🟡🟢", "Acceptance Criteria", "Owner"],
-        "hint": "Each requirement gets 30–80 words max. Use priority emoji for visual scanning."
+        "hint": "Each requirement gets 30–80 words max. Use priority emoji for visual scanning. IDs should follow format BR-{nnn} for traceability."
       },
       "Success Metrics": {
         "target": 100,
@@ -93,9 +259,10 @@
         "target": 0,
         "max": 0,
         "format": "risk-heat-map-and-register",
+        "riskLevel": "full",
         "heatMapDimensions": { "likelihood": ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"], "impact": ["Negligible", "Minor", "Moderate", "Major", "Severe"] },
         "registerColumns": ["ID", "Risk", "Likelihood", "Impact", "Score", "Owner", "Mitigation"],
-        "hint": "Show 5×5 heat map first using colored emoji (🟢🟡🟠🔴), then detailed register table below."
+        "hint": "Show 5×5 heat map first using colored emoji (🟢🟡🟠🔴), then detailed register table below. Risk IDs should follow format RISK-{nnn}. Score = Likelihood (1-5) × Impact (1-5)."
       },
       "Next Steps & Decision Log": {
         "target": 80,
@@ -139,6 +306,24 @@
     "expertRole": "senior business analyst",
     "description": "Business requirements focusing on ROI, stakeholder value, strategic alignment, and measurable outcomes. Uses RACI matrices, risk heat maps, and SMART objectives.",
     "totalWordTarget": { "min": 1500, "max": 2500, "excludes": ["tables", "appendices"] },
+    "qualityGate": {
+      "description": "Pre-output checklist. Every item must pass before finalizing. Applies to both generation and refinement.",
+      "checks": [
+        "Objective is self-contained: a reader can decide whether to read further based on Objective alone",
+        "Every Business Objective is SMART — if any objective lacks a number or date, it fails",
+        "No requirement in the Requirements table is longer than 80 words",
+        "Every row in Success Metrics has a specific number in Baseline and Target columns — no 'TBD' or 'N/A'",
+        "Risk Assessment has at least 3 risks — if fewer, the analysis is superficial",
+        "No section restates the Objective in different words",
+        "RACI table has exactly one A (Accountable) per row"
+      ],
+      "refinementSpecific": [
+        "Output is same length or shorter than input — if longer, justify every added sentence",
+        "No new filler phrases were introduced (check antiPatterns list)",
+        "All specific numbers, dates, and names from the original are preserved",
+        "Vague statements were replaced with specific ones, not just reworded"
+      ]
+    },
     "progressiveDisclosure": {
       "10_second_scan": ["Epic Status", "Objective"],
       "2_minute_read": ["Business Objectives", "Scope & Non-Scope", "Success Metrics"],
@@ -157,7 +342,8 @@
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What are we building, why, and what's the key architectural decision? One paragraph that gives full context."
+        "hint": "What are we building, why, and what's the key architectural decision? One paragraph that gives full context.",
+        "example": "Design an event-driven notification service to replace the current synchronous email pipeline, enabling sub-second delivery across email, SMS, and push channels while supporting 10x current throughput (50K→500K messages/hour) with independent channel scaling."
       },
       "Context & Motivation": {
         "target": 200,
@@ -178,7 +364,7 @@
             "target": 200,
             "max": 400,
             "diagram": "mermaid-flowchart",
-            "hint": "Include a mermaid architecture diagram. The diagram IS the source of truth — no stale images."
+            "hint": "Include a mermaid architecture diagram. The diagram IS the source of truth — no stale images. Keep to 15 nodes max for readability."
           },
           "Data Model & Storage": {
             "target": 100,
@@ -194,6 +380,7 @@
           "Key Algorithms & Logic": {
             "target": 100,
             "max": 300,
+            "conditional": "Include only if non-trivial logic exists. Skip for straightforward CRUD operations.",
             "hint": "Only for non-trivial logic. Skip if straightforward CRUD."
           }
         }
@@ -203,7 +390,7 @@
         "max": 600,
         "format": "comparison-table-and-prose",
         "columns": ["Option", "Pros", "Cons", "Why Rejected/Chosen"],
-        "hint": "⭐ THIS IS THE MOST IMPORTANT SECTION (per Google). Shows rigorous thinking. Each alternative gets 100–200 words."
+        "hint": "⭐ THIS IS THE MOST IMPORTANT SECTION (per Google). Shows rigorous thinking. Each alternative gets 100–200 words. Include at least 2 genuine alternatives — not straw men."
       },
       "Cross-Cutting Concerns": {
         "target": 200,
@@ -226,7 +413,9 @@
         "target": 0,
         "max": 0,
         "format": "risk-register-table",
-        "columns": ["Risk", "Likelihood", "Impact", "Mitigation", "Owner"]
+        "riskLevel": "standard",
+        "columns": ["Risk", "Likelihood", "Impact", "Mitigation", "Owner"],
+        "hint": "Use standard likelihood values: Rare, Unlikely, Possible, Likely, Almost Certain. Use standard impact values: Negligible, Minor, Moderate, Major, Severe."
       },
       "Open Questions": {
         "target": 50,
@@ -270,6 +459,24 @@
     "expertRole": "senior software architect",
     "description": "Technical design documents following Google's design doc philosophy — context, goals/non-goals, proposed design, alternatives considered, and cross-cutting concerns. Emphasizes demonstrating rigorous thinking through explicit trade-off analysis.",
     "totalWordTarget": { "min": 2000, "max": 4000, "excludes": ["tables", "code-blocks", "diagrams", "appendix"] },
+    "qualityGate": {
+      "description": "Pre-output checklist. Every item must pass before finalizing.",
+      "checks": [
+        "Objective states the key architectural decision, not just the feature being built",
+        "Non-Goals list has at least 2 items that could reasonably be goals — not straw men",
+        "Alternatives Considered has at least 2 genuine alternatives with real pros, not just the chosen option",
+        "Architecture diagram exists and matches the prose — no components mentioned in text but missing from diagram",
+        "Every API contract has a working JSON request/response example",
+        "No section opens with 'This section describes...' or 'In this section we will...'",
+        "Cross-Cutting Concerns contain project-specific details, not generic advice"
+      ],
+      "refinementSpecific": [
+        "Output is same length or shorter than input",
+        "Technical details were not moved into Business Context or Objective",
+        "Trade-off analysis in Alternatives Considered was preserved or strengthened, not diluted",
+        "No new throat-clearing phrases ('It is important to note...') were introduced"
+      ]
+    },
     "progressiveDisclosure": {
       "10_second_scan": ["Epic Status", "Objective"],
       "2_minute_read": ["Goals & Non-Goals", "Architecture Overview diagram", "Alternatives Considered table"],
@@ -287,7 +494,8 @@
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What user problem are we solving, and how will we know we've solved it? Lead with the user impact."
+        "hint": "What user problem are we solving, and how will we know we've solved it? Lead with the user impact.",
+        "example": "Enable users to save and reuse delivery addresses, reducing checkout abandonment by 15% and average checkout time from 4.2 minutes to under 90 seconds for returning customers."
       },
       "Problem Statement": {
         "target": 100,
@@ -301,7 +509,8 @@
         "titleFormat": "US-{nn}: {Short descriptive title, 3-6 words}",
         "template": "**US-{nn}: {title}**\nAs a [persona], I want [action] so that [outcome]\n**Acceptance Criteria:** [testable criterion]",
         "count": { "min": 3, "max": 7 },
-        "hint": "Each user story MUST begin with a bold, scannable title in the format 'US-01: One-Click Reorder' followed by the As a… statement. Titles should be unique, concise (3-6 words), and action-oriented. Each story must map to at least one testable acceptance criterion listed directly below it."
+        "hint": "Each user story MUST begin with a bold, scannable title in the format 'US-01: One-Click Reorder' followed by the As a… statement. Titles should be unique, concise (3-6 words), and action-oriented. Each story must map to at least one testable acceptance criterion listed directly below it.",
+        "example": "**US-01: Save Delivery Address**\nAs a returning customer, I want to save my delivery address so that I don't have to re-enter it on every order.\n**Acceptance Criteria:** User can save up to 5 addresses; saved addresses appear as selectable options at checkout; user can edit or delete saved addresses from account settings."
       },
       "Scope & Non-Scope": {
         "target": 100,
@@ -312,13 +521,14 @@
         "target": 0,
         "max": 0,
         "format": "requirements-table",
-        "columns": ["ID", "Requirement", "Priority 🔴🟠🟡🟢", "User Story Ref", "Acceptance Criteria"]
+        "columns": ["ID", "Requirement", "Priority 🔴🟠🟡🟢", "User Story Ref", "Acceptance Criteria"],
+        "hint": "Each requirement must be atomic (one testable behavior per row), reference a User Story by ID (e.g. US-01), and include pass/fail acceptance criteria. Priority must use emoji indicators. IDs should follow format FR-{nnn} for traceability."
       },
       "User Flows": {
         "target": 100,
         "max": 300,
         "diagram": "mermaid-flowchart",
-        "hint": "Include mermaid flowcharts for happy path AND key error paths. Don't just document the sunshine scenario."
+        "hint": "Include mermaid flowcharts for happy path AND key error paths. Don't just document the sunshine scenario. Keep to 15 nodes max per diagram for readability."
       },
       "Edge Cases & Error Handling": {
         "target": 80,
@@ -331,7 +541,8 @@
         "max": 0,
         "format": "nfr-table",
         "columns": ["Category", "Requirement", "Target", "Measurement"],
-        "hint": "Be specific: 'P99 latency < 200ms' not 'should be fast'"
+        "categoryEnum": ["Performance", "Scalability", "Availability", "Security", "Accessibility", "Compliance", "Data Retention", "Usability"],
+        "hint": "Use standard categories from categoryEnum. Be specific and quantified: 'P99 latency < 200ms' not 'should be fast'. Every requirement must have a measurable target and a method to verify it."
       },
       "Analytics & Success Metrics": {
         "target": 80,
@@ -361,7 +572,9 @@
         "target": 0,
         "max": 0,
         "format": "risk-register-table",
+        "riskLevel": "standard",
         "columns": ["Risk", "Likelihood", "Impact", "Mitigation", "Owner"],
+        "hint": "Use standard likelihood values: Rare, Unlikely, Possible, Likely, Almost Certain. Use standard impact values: Negligible, Minor, Moderate, Major, Severe.",
         "collapsible": false
       },
       "Competitive Analysis": {
@@ -378,6 +591,24 @@
     "expertRole": "senior product manager",
     "description": "Feature specifications that bridge product and engineering — evidence-based problem statements, user stories with acceptance criteria, explicit edge cases, launch plans with rollback criteria, and measurable success metrics.",
     "totalWordTarget": { "min": 1500, "max": 2500, "excludes": ["tables", "diagrams"] },
+    "qualityGate": {
+      "description": "Pre-output checklist. Every item must pass before finalizing.",
+      "checks": [
+        "Problem Statement leads with evidence (data, ticket counts, metrics) — not opinions or assumptions",
+        "Every User Story has a bold title in US-{nn} format before the As a… statement",
+        "Every User Story maps to at least one Functional Requirement via ID reference",
+        "Edge Cases table has at least 5 scenarios — if fewer, the happy-path bias is too strong",
+        "Non-Functional Requirements use specific numbers ('P99 < 200ms') not adjectives ('fast', 'responsive')",
+        "Launch Plan includes explicit rollback criteria — not just rollout steps",
+        "No section contains generic filler like 'ensure a good user experience'"
+      ],
+      "refinementSpecific": [
+        "Output is same length or shorter than input",
+        "User Story titles were not removed or made generic during refinement",
+        "Acceptance Criteria from original were preserved — not dropped or made vaguer",
+        "No new bullet points were added that fail the 'applies to every project' test"
+      ]
+    },
     "progressiveDisclosure": {
       "10_second_scan": ["Epic Status", "Objective"],
       "2_minute_read": ["Problem Statement", "User Stories", "Success Metrics"],
@@ -395,7 +626,8 @@
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What does this API do, who consumes it, and what's the key design principle?"
+        "hint": "What does this API do, who consumes it, and what's the key design principle?",
+        "example": "Provide a RESTful API for the Partner Portal to manage merchant onboarding workflows, consumed by the Partner Dashboard (React) and three external integration partners. Key principle: idempotent operations with optimistic concurrency control."
       },
       "Overview & Authentication": {
         "target": 150,
@@ -407,7 +639,7 @@
         "max": 0,
         "format": "schema-table",
         "columns": ["Field", "Type", "Required", "Description", "Constraints", "Example"],
-        "hint": "One table per resource. Include validation rules and constraints."
+        "hint": "One table per resource. Include validation rules and constraints. Mark required fields clearly."
       },
       "Endpoints": {
         "target": 200,
@@ -479,6 +711,23 @@
     "expertRole": "senior API architect",
     "description": "API specifications modeled after Stripe's gold standard — working examples for every endpoint, standardized error envelopes, explicit rate limits, webhook delivery guarantees, and versioning strategy. Developer experience is the primary design constraint.",
     "totalWordTarget": { "min": 2000, "max": 5000, "excludes": ["code-blocks", "tables", "schemas"] },
+    "qualityGate": {
+      "description": "Pre-output checklist. Every item must pass before finalizing.",
+      "checks": [
+        "Every endpoint has a working cURL example that a developer could copy-paste and run",
+        "Every endpoint has at least one error response documented — not just the happy path",
+        "Error codes follow a consistent naming convention (e.g., SCREAMING_SNAKE_CASE) across all endpoints",
+        "Rate limits are exact numbers, not 'reasonable limits' or 'subject to change'",
+        "Resource schema tables have Example column filled for every field — no empty cells",
+        "Authentication section specifies token lifetime and refresh mechanism"
+      ],
+      "refinementSpecific": [
+        "Output is same length or shorter than input",
+        "No working code examples were removed or broken during refinement",
+        "Endpoint paths and HTTP methods were not changed unless explicitly requested",
+        "Schema field names and types were preserved exactly"
+      ]
+    },
     "progressiveDisclosure": {
       "10_second_scan": ["Epic Status", "Objective"],
       "2_minute_read": ["Overview & Authentication", "Resource Definitions"],
@@ -496,7 +745,8 @@
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What infrastructure are we building/changing, why, and what are the key SLA targets?"
+        "hint": "What infrastructure are we building/changing, why, and what are the key SLA targets?",
+        "example": "Deploy a multi-region active-active PostgreSQL cluster on AWS to achieve 99.99% availability (currently 99.9%), reduce cross-region read latency from 180ms to <40ms, and support the projected 3x traffic growth through Q4 2025."
       },
       "Business Context": {
         "target": 80,
@@ -508,20 +758,20 @@
         "max": 0,
         "format": "slo-table",
         "columns": ["Metric (SLI)", "Current Value", "Target SLO", "Error Budget", "Measurement"],
-        "hint": "Availability, latency percentiles, throughput, error rate. Current vs target."
+        "hint": "Availability, latency percentiles, throughput, error rate. Current vs target. Every SLO must have an error budget calculated."
       },
       "Architecture Overview": {
         "target": 300,
         "max": 500,
         "diagram": "mermaid-flowchart",
-        "hint": "Mermaid architecture diagram is mandatory. Show all services, data stores, network boundaries, and traffic flow."
+        "hint": "Mermaid architecture diagram is mandatory. Show all services, data stores, network boundaries, and traffic flow. Keep to 15 nodes max for readability — use subgraphs to group related components."
       },
       "Component Design": {
         "target": 200,
         "max": 600,
         "format": "per-component-subsections",
         "perComponent": { "target": 80, "max": 200 },
-        "hint": "One subsection per major component: compute, storage, networking, CDN, queues, etc."
+        "hint": "One subsection per major component: compute, storage, networking, CDN, queues, etc. Each component must answer: how does it fail, how do we know, how do we recover?"
       },
       "Network & Security Architecture": {
         "target": 150,
@@ -612,6 +862,23 @@
     "expertRole": "senior DevOps/SRE engineer",
     "description": "Infrastructure design documents emphasizing operational readiness — explicit SLA/SLO targets, cost analysis, disaster recovery with tested RPO/RTO, observability with alerting rules, and scaling strategies with cost implications. Every component must answer: how does it fail, how do we know, how do we recover?",
     "totalWordTarget": { "min": 2500, "max": 4500, "excludes": ["tables", "diagrams", "runbooks"] },
+    "qualityGate": {
+      "description": "Pre-output checklist. Every item must pass before finalizing.",
+      "checks": [
+        "SLA/SLO table has Current Value filled for every metric — shows we measured before designing",
+        "Every component in Component Design answers: how does it fail, how do we know, how do we recover",
+        "Disaster Recovery table has 'Last Tested' column filled — untested DR plans are fiction",
+        "Cost Analysis flags the top 3 cost drivers explicitly",
+        "Scaling Strategy includes cost-at-max for every component — scaling without cost awareness is dangerous",
+        "Architecture diagram matches the Component Design sections — no orphan components in either"
+      ],
+      "refinementSpecific": [
+        "Output is same length or shorter than input",
+        "Specific cost figures, SLO numbers, and capacity numbers were preserved exactly",
+        "No alerting rules or runbook links were removed",
+        "Generic statements like 'follow security best practices' were replaced with specifics, not just kept"
+      ]
+    },
     "progressiveDisclosure": {
       "10_second_scan": ["Epic Status", "Objective", "SLA/SLO Requirements table"],
       "2_minute_read": ["Architecture Overview diagram", "Cost Analysis", "Disaster Recovery table"],
@@ -629,7 +896,8 @@
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What are we migrating, from where to where, when, and what's the rollback window?"
+        "hint": "What are we migrating, from where to where, when, and what's the rollback window?",
+        "example": "Migrate 2.3TB of customer order data from on-prem Oracle 12c to AWS Aurora PostgreSQL 15 with zero-downtime cutover on March 15, 2025. Rollback window: 72 hours post-cutover. Dual-write period: 2 weeks."
       },
       "Current State": {
         "target": 200,
@@ -658,15 +926,16 @@
         "max": 0,
         "format": "raci-table",
         "columns": ["Activity", "Responsible", "Accountable", "Consulted", "Informed"],
-        "hint": "Migration plans cross multiple teams. RACI eliminates 'I thought they were doing that' failures."
+        "hint": "Each row must have exactly ONE Accountable person. Bold the R and A cells. Migration plans cross multiple teams — RACI eliminates 'I thought they were doing that' failures."
       },
       "Risk Assessment": {
         "target": 0,
         "max": 0,
         "format": "risk-heat-map-and-register",
+        "riskLevel": "full",
         "heatMapDimensions": { "likelihood": ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"], "impact": ["Negligible", "Minor", "Moderate", "Major", "Severe"] },
         "registerColumns": ["ID", "Risk", "Likelihood", "Impact", "Score", "Owner", "Mitigation", "Contingency"],
-        "hint": "⭐ HIGHEST-STAKES DOCUMENT TYPE. Risk assessment must be thorough. Include contingency plans, not just mitigations."
+        "hint": "⭐ HIGHEST-STAKES DOCUMENT TYPE. Risk assessment must be thorough. Include contingency plans (what we do if the mitigation fails), not just mitigations. Risk IDs should follow format RISK-{nnn}. Score = Likelihood (1-5) × Impact (1-5)."
       },
       "Timeline & Milestones": {
         "target": 0,
@@ -739,6 +1008,24 @@
     "expertRole": "senior migration specialist / SRE",
     "description": "Migration plans as operational playbooks — current/target state architectures, explicit RACI ownership, risk heat maps with contingency plans, step-by-step cutover and rollback procedures, dry run plans, and communication matrices. Designed for the highest-stakes document type in engineering.",
     "totalWordTarget": { "min": 2500, "max": 4000, "excludes": ["tables", "diagrams", "checklists"] },
+    "qualityGate": {
+      "description": "Pre-output checklist. Every item must pass before finalizing.",
+      "checks": [
+        "Current State and Target State both have architecture diagrams — text-only descriptions fail during execution",
+        "Risk Assessment has at least 5 risks with Contingency plans (not just Mitigations) — this is the highest-stakes doc type",
+        "Cutover Plan has time estimates for every step and a named responsible person",
+        "Rollback Plan has explicit trigger conditions (what metrics/events activate rollback)",
+        "Dry Run Plan specifies how many dry runs and success criteria for each",
+        "RACI Matrix has exactly one A per row and covers at least: cutover, rollback, communication, validation",
+        "Every milestone in Timeline has Go/No-Go criteria — milestones without criteria are just dates"
+      ],
+      "refinementSpecific": [
+        "Output is same length or shorter than input",
+        "No steps were removed from Cutover or Rollback procedures — steps can be reworded but not dropped",
+        "Time estimates, dates, and rollback windows were preserved exactly",
+        "Risk contingency plans were not downgraded to generic mitigations"
+      ]
+    },
     "progressiveDisclosure": {
       "10_second_scan": ["Epic Status", "Objective"],
       "2_minute_read": ["Current State diagram", "Target State diagram", "Timeline & Milestones", "Risk heat map"],
@@ -756,26 +1043,28 @@
       "Objective": {
         "target": 80,
         "max": 150,
-        "hint": "What systems are being integrated, what data flows between them, and what's the SLA?"
+        "hint": "What systems are being integrated, what data flows between them, and what's the SLA?",
+        "example": "Integrate Salesforce CRM with the internal Order Management System (OMS) via event-driven messaging to synchronize customer and order data in near-real-time (<5s propagation), replacing the current nightly batch sync that causes 12-hour data staleness."
       },
       "Integration Overview": {
         "target": 100,
         "max": 200,
         "diagram": "mermaid-context-diagram",
-        "hint": "System context diagram showing all participating systems, direction of data flow, and integration pattern (sync/async/event)."
+        "hint": "System context diagram showing all participating systems, direction of data flow, and integration pattern (sync/async/event). Keep to 8 participants max for readability."
       },
       "Systems & Endpoints": {
         "target": 0,
         "max": 0,
         "format": "system-table",
-        "columns": ["System", "Owner Team", "Base URL", "Auth Mechanism", "Rate Limits", "SLA"]
+        "columns": ["System", "Owner Team", "Base URL", "Auth Mechanism", "Rate Limits", "SLA"],
+        "hint": "One row per system. Include all environments (dev/staging/prod) if URLs differ."
       },
       "Data Contract & Mappings": {
         "target": 100,
         "max": 300,
         "format": "mapping-table",
         "columns": ["Source Field", "Source Type", "Target Field", "Target Type", "Transformation", "Required", "Notes"],
-        "hint": "Include schema validation rules. Use inline diff for contract changes."
+        "hint": "Include schema validation rules. Use inline diff for contract changes. Document null-handling and default values for every field."
       },
       "Integration Flows": {
         "target": 150,
@@ -784,7 +1073,7 @@
         "subsections": {
           "Happy Path": { "diagram": "mermaid-sequence", "required": true },
           "Error / Retry Path": { "diagram": "mermaid-sequence", "required": true, "hint": "DO NOT SKIP. Error flows are where integrations actually fail." },
-          "Recovery / Reconciliation Path": { "diagram": "mermaid-sequence", "required": false }
+          "Recovery / Reconciliation Path": { "diagram": "mermaid-sequence", "required": false, "conditional": "Include if data consistency guarantees require reconciliation between systems." }
         }
       },
       "Error Handling & Recovery": {
@@ -792,7 +1081,7 @@
         "max": 300,
         "format": "error-strategy-table",
         "columns": ["Error Scenario", "Detection", "Retry Policy", "Dead Letter Queue", "Alert", "Manual Intervention"],
-        "hint": "Retry policies: max attempts, backoff strategy (exponential/linear), circuit breaker thresholds."
+        "hint": "Retry policies: max attempts, backoff strategy (exponential/linear), circuit breaker thresholds. Every error scenario must have a defined detection method and resolution path."
       },
       "Security & Data Privacy": {
         "target": 100,
@@ -814,7 +1103,8 @@
         "target": 0,
         "max": 0,
         "format": "sla-table",
-        "columns": ["Metric", "Requirement", "Measurement Method", "Breach Escalation"]
+        "columns": ["Metric", "Requirement", "Measurement Method", "Breach Escalation"],
+        "hint": "Define SLAs for end-to-end data propagation time, not just individual system response time."
       }
     },
     "optionalSections": {
@@ -854,6 +1144,23 @@
     "expertRole": "senior integration architect",
     "description": "Integration specifications as enforceable contracts — explicit data mappings, sequence diagrams for happy AND error paths, retry policies with circuit breaker thresholds, SLA definitions with breach escalation, and monitoring that tracks integration health specifically. Error flows are required, not optional.",
     "totalWordTarget": { "min": 1800, "max": 3500, "excludes": ["tables", "diagrams", "runbooks"] },
+    "qualityGate": {
+      "description": "Pre-output checklist. Every item must pass before finalizing.",
+      "checks": [
+        "Both Happy Path AND Error/Retry Path have sequence diagrams — error path is NOT optional",
+        "Error Handling table has retry policy details (max attempts, backoff type, circuit breaker threshold) for every scenario",
+        "Data Contract table has Transformation column filled — empty means 'nobody thought about this'",
+        "Monitoring table tracks integration-level metrics (message throughput, queue depth) not just system metrics (CPU, memory)",
+        "SLA table has Breach Escalation column filled — SLAs without escalation paths are aspirational, not enforceable",
+        "Every system in Systems & Endpoints has Auth Mechanism and Rate Limits filled"
+      ],
+      "refinementSpecific": [
+        "Output is same length or shorter than input",
+        "Data field mappings were preserved exactly — field names and types cannot be changed during refinement",
+        "Retry policies and circuit breaker thresholds were not removed or made vague",
+        "Sequence diagrams were not simplified to the point of losing error handling steps"
+      ]
+    },
     "progressiveDisclosure": {
       "10_second_scan": ["Epic Status", "Objective"],
       "2_minute_read": ["Integration Overview diagram", "Systems & Endpoints table", "SLA table"],
