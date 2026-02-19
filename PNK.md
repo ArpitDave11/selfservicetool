@@ -1,4 +1,4 @@
-# Current Scenario:
+# Broadridge Cash Management → Data Mesh Ingestion (Axway + Kafka)
 
 [[_TOC_]]
 
@@ -6,252 +6,359 @@
 
 ---
 
-## Epic Status
+## Executive Summary
+
+We are integrating **Broadridge Cash Management** files into the **Data Mesh** while keeping the **existing Mainframe (MF) downstream flow unchanged**. Today, Data Mesh ingestion is **control-file driven**: a Control File arrives in `Controlfile/`, triggers the pipeline, and the pipeline reads both the control file and the data file from `datafiles/`, performs validation, and writes **Parquet outputs**.
+
+Broadridge's Cash Management flow currently lands files onto **Axway** and publishes **Kafka notifications** (including **MD5** checksum). We will introduce a **Kafka-triggered Axway→Mesh pull pipeline** that copies the file into Data Mesh ingestion storage and generates a Control File from the Kafka message. We will also enhance the existing Data Mesh pipeline to support **MD5 alongside SHA256**, parse files where **records/fields are enclosed in `*`**, and enforce a **Broadridge-provided schema** when creating Parquet.
+
+---
+
+## Current Scenario (As-Is)
+
+### Existing Data Mesh ingestion
+- Azure Ingestion Container layout:
+  - `datafiles/` — data files arrive here
+  - `Controlfile/` — control files arrive here (single-record metadata: Count, Business Date, Checksum, etc.)
+- Pipeline is triggered by **Control File arrival**:
+  - reads control + data file
+  - validates that no data loss occurred (checksum / counts)
+  - writes Parquet output for downstream consumers
+- Supported file types: **CSV / TXT / PARQUET**
+- Current checksum validation: **SHA256**
+
+### Existing Broadridge → Axway → MF flow (must remain)
+1. Broadridge sends Cash Management data file to **SFG (SFTP)**
+2. Broadridge sends a **Kafka notification** (includes **MD5 checksum** and metadata)
+3. **ESL Service** pulls the file from SFG and places it onto **Axway**
+4. ESL Service posts a second **Kafka notification** (file available on Axway)
+5. This second Kafka message triggers the **MF Job**
+6. MF Job reads the file from Axway and transforms it (removes `*` used to enclose fields/records)
+
+**Important:** The MF flow must remain unchanged to avoid impacting existing downstream consumers.
+
+---
 
 ## Objective
 
-Integrate Broadridge Cash Management files into the Data Mesh by extending the existing Azure ingestion pipeline and adding a new Axway connector that pulls files into the Azure ingestion container’s datafiles/ and Controlfile directory. Keep the control-file-driven trigger, SHA256 validation, CSV/TXT/PARQUET parsing, and Parquet outputs. Decision: reuse and extend the current pipeline to minimize rework and preserve validation; tradeoff is faster integration and lower duplication versus increased coupling and added connector error‑handling complexity.
+Onboard Broadridge Cash Management files into Data Mesh by:
 
-## Context & Motivation
+1. **Pulling the file from Axway** into the Azure Ingestion Container `datafiles/`
+2. **Generating a Control File from the Kafka message** into `Controlfile/` to trigger existing ingestion behavior
+3. Enhancing pipeline + registry to support:
+   - **MD5 validation** in addition to SHA256 (config-driven)
+   - Parsing **`*` enclosed fields/records**
+   - **Schema enforcement** using Broadridge schema file during Parquet creation
+4. Ensuring the file remains available in Axway long enough for both MF and Data Mesh to access it:
+   - **Disable deletion** after MF pull or implement an agreed retention policy
 
-The goal is to onboard Broadridge Cash Management files into the organization’s Data Mesh by extending the existing Azure ingestion pipeline and adding an Axway connector. Decision: reuse the current control-file-driven ingestion flow rather than rearchitecting the pipeline. The Axway connector will pull files and deposit data files into the Azure ingestion container’s datafiles/ path and place matching single-record control files into the Controlfile directory to trigger ingestion.
+---
 
-Why this approach:
-- Leverages the existing pipeline’s validation (SHA256), parsing (csv/txt/parquet), and Parquet output logic, minimizing changes and development risk.
-- Keeps the ingestion trigger model (control file arrival) intact, preserving downstream expectations and tooling.
+## Goals / Non-Goals
 
-Tradeoffs and risks:
-- Connector responsibility increases: it must guarantee atomic placement of data + control files, conform to the existing control-file schema (Count, Business Date, Checksum, etc.), and handle partial transfers; otherwise pipeline runs may fail or require retries.
-- Any Axway-specific metadata mapping or format normalization must be implemented in the connector, adding scope to the connector work rather than the pipeline.
-- Operational dependency moves to the connector for latency and reliability; monitoring and retry strategies for the connector must be defined (not in scope here).
+### Goals
+- New **Kafka-triggered Axway→Mesh pull pipeline**:
+  - triggered by ESL Kafka notification (post-Axway placement)
+  - copies file from Axway to `datafiles/`
+  - creates a Control File in `Controlfile/` using Kafka message metadata
+- Enhance existing ingestion pipeline:
+  - support checksum validation **MD5 or SHA256** based on registry configuration
+  - parse `*`-enclosed records/fields (in addition to existing delimiter parsing)
+  - enforce Broadridge schema during Parquet output generation
+- Setup required connectivity and permissions:
+  - **Data Mesh ↔ Axway connection**
+  - Kafka topic access/ACLs
+  - Axway retention/deletion change
 
-Relevant issues/epics: no issue or epic links were provided; please attach BR-Axway-Connector and BR-Pipeline-Enhancement epics if available.
+### Non-Goals
+- No changes to Mainframe job processing logic or existing MF downstream consumers
+- No change to the ingestion container directory model (`datafiles/`, `Controlfile/`)
+- No upstream changes to Broadridge file generation behavior
+- No replacement of Kafka with another trigger mechanism
 
-## Goals & Non-Goals
+---
 
-Goals:
-- Implement an Axway connector that pulls Broadridge Cash Management files into the existing Azure Ingestion Container, placing files into datafiles/ and Controlfile directories. Decision: reuse the current control-file-triggered ingestion pipeline to minimize scope and risk; tradeoff: changes limited to connector and delivery path, not pipeline logic.
-- Preserve existing control-file schema, SHA256 validation, parsing (csv/txt/parquet) and Parquet outputs for downstream compatibility.
+## Proposed End-to-End Design (To-Be)
 
-Non-Goals:
-- Not redesigning the ingestion pipeline or replacing SHA256 validation.
-- Not changing control-file schema or Azure storage layout.
-- Not adding new file formats beyond csv/txt/parquet.
-- Not negotiating external SLAs with Broadridge or introducing new SLOs/SLIs or downstream transformations within this scope.
+### High-Level Flow
+1. ESL Service places file on Axway and posts **Kafka notification**
+2. Kafka triggers **Axway→Mesh Pull Pipeline**
+3. Pull pipeline:
+   - pulls file from Axway
+   - copies it into `datafiles/`
+   - generates Control File into `Controlfile/` based on Kafka metadata
+4. Existing ingestion pipeline triggers from Control File:
+   - reads file + control
+   - validates checksum (MD5 or SHA256 per registry)
+   - parses file (including `*` enclosure)
+   - applies Broadridge schema
+   - writes Parquet outputs to Mesh for new consumers (e.g., DHARMA)
 
-## Proposed Design
-
-Overview
-- Deliver a lightweight Axway connector that deposits Broadridge Cash Management data files and accompanying Control Files into the existing Azure ingestion container (datafiles/ and Controlfile directory). The existing ingestion pipeline remains unchanged and continues to perform SHA256 validation, parsing (csv/txt/parquet) and Parquet output writes. The connector is responsible only for reliably transferring files from Axway into the container in a manner that preserves the pipeline’s trigger semantics.
-
-Connector placement and runtime
-- Implement the connector as an Azure-hosted component (container or Function App) that runs scheduled, idempotent pulls from Axway. Decision: an Azure-hosted pull process minimizes changes to the existing pipeline and centralizes network credentials and monitoring in the same cloud tenancy. Tradeoff: polling introduces small latency versus a push model; chosen because Axway push integration details are not in scope and polling is robust across Axway configurations.
-
-File transfer and atomic placement
-- Data files are downloaded to a transient staging location (local temp or staging blob path). After successful download and local checksum verification (SHA256 computed by connector), the connector uploads the data file into datafiles/ using a temporary filename and then performs an atomic rename/commit (move) to the final datafiles/ path. The Control File is uploaded to the Controlfile directory only after the data file is in its final location and verified. Decision: writing the data first and then placing the Control File preserves the pipeline’s trigger semantics; atomic moves avoid partially visible files. Tradeoff: requires careful ordering and storage operations; Azure Blob does not support server-side rename so the connector must perform copy-then-delete (acceptable operational cost).
-
-Control File handling and idempotency
-- The connector will produce Control Files that match the existing single-record metadata schema (Count, Business Date, Checksum, unique FileID). The connector will populate the checksum field with the SHA256 computed locally. In order to prevent duplicate ingestion, the connector will include a unique FileID and filename pattern aligned with existing pipeline expectations. The pipeline’s existing SHA256 validation remains the authoritative SLI for file integrity. Decision: maintain existing control-file schema to avoid pipeline changes. Tradeoff: connector must ensure schema fidelity exactly; any mismatch will surface as pipeline validation failure.
-
-Error handling and failure modes
-- On download or upload errors, the connector will (a) place the source file in an Axway retry/hold in Axway (if supported) or (b) leave it for subsequent polling, and (c) log and surface a failure record in a designated blob path (ingestion_errors/) including reasons and original Axway identifiers. If checksum verification fails, the connector will not publish the Control File and will mark the file as quarantined. Decision: avoid publishing Control Files when integrity is suspect to prevent pipeline execution on bad data. Tradeoff: manual intervention may be required for quarantined files.
-
-Concurrency and scaling
-- Connector instances will coordinate using blob-lease or an Azure storage-based lock to ensure only one instance pulls a given Axway transfer batch. Decision: simple lease-based locking is sufficient given per-source file volumes and avoids introducing additional infrastructure. Tradeoff: lease conflicts can delay processing; acceptable given expected throughput.
-
-Minimal changes to existing pipeline
-- No changes to the pipeline’s validation, parsing, or output logic are required. The connector’s responsibility is to faithfully produce files and matching Control Files in the exact container paths and naming conventions the pipeline expects. Decision: reduce risk by keeping pipeline unchanged. Tradeoff: any existing pipeline assumptions about control-file timing must be observed by connector implementation.
-
-Operational notes (implementation constraints)
-- Connector must log Axway transfer IDs alongside blob paths for traceability. It must populate checksum exactly as used by the pipeline (SHA256). Any enhancements to control-file schema or trigger behavior are out of scope.
-
-## Architecture Diagram
-
+### Correct System Architecture Diagram
 ```mermaid
-%%{init: {
-  'theme': 'base',
-  'themeVariables': {
-    'primaryColor': '#0072B2',
-    'primaryTextColor': '#FFFFFF',
-    'primaryBorderColor': '#005A8C',
-    'secondaryColor': '#56B4E9',
-    'secondaryTextColor': '#FFFFFF',
-    'tertiaryColor': '#E69F00',
-    'lineColor': '#64748B',
-    'textColor': '#1F2937',
-    'clusterBkg': '#F0F9FF',
-    'clusterBorder': '#BAE6FD'
-  }
-}}%%
 flowchart LR
-    %% Reusable style classes
-    classDef client fill:#56B4E9,stroke:#0072B2,color:#fff,stroke-width:2px
-    classDef infra fill:#64748B,stroke:#475569,color:#fff,stroke-width:2px
-    classDef service fill:#0072B2,stroke:#005A8C,color:#fff,stroke-width:2px
-    classDef database fill:#E69F00,stroke:#CC8800,color:#fff,stroke-width:2px
-    classDef queue fill:#009E73,stroke:#007A5E,color:#fff,stroke-width:2px
-    classDef external fill:#CC79A7,stroke:#AA5A87,color:#fff,stroke-width:2px
-    classDef auth fill:#D55E00,stroke:#B34700,color:#fff,stroke-width:2px
+  BR[Broadridge] -->|CashMgmt file| SFG[SFG (SFTP)]
+  BR -->|Kafka msg: MD5, biz date, filename, metadata| K1[(Kafka)]
 
-    subgraph CL["Client Layer"]
-        WEB[Web App]:::client
-        MOB[Mobile App]:::client
-        CLI[CLI Tool]:::client
-    end
+  SFG -->|pull| ESL[ESL Service]
+  ESL -->|place file| AX[Axway]
+  ESL -->|Kafka msg: file available on Axway| K2[(Kafka)]
 
-    subgraph GW["Gateway Layer"]
-        LB[Load Balancer]:::infra
-        AG[API Gateway]:::infra
-        AUTH[Auth Service]:::auth
-    end
+  K2 -->|triggers| PULL[Axway→Mesh Pull Pipeline]
+  PULL -->|copy file| DF[datafiles/]
+  PULL -->|create control file from Kafka msg| CF[Controlfile/]
 
-    subgraph SVC["Service Layer"]
-        API[API Service]:::service
-        USR[User Service]:::service
-        ORD[Order Service]:::service
-        WRK(Background Worker):::service
-    end
+  DF --> ING[Existing Mesh Ingestion Pipeline]
+  CF -->|triggers| ING
 
-    subgraph DATA["Data Layer"]
-        PG[(Postgres)]:::database
-        REDIS[(Redis)]:::database
-        KAFKA([Kafka]):::queue
-        S3[(Object Storage)]:::database
-    end
+  ING --> VAL[Checksum validation (MD5/SHA256 via registry)]
+  ING --> PARSE[Parsing (delimiter + '*' enclosure)]
+  ING --> SCHEMA[Schema enforcement (Broadridge schema)]
+  ING --> PQ[Parquet output (Data Mesh)]
 
-    subgraph EXT["External Integrations"]
-        STRP{{Stripe}}:::external
-        EMAIL{{SendGrid}}:::external
-        OAUTH{{OAuth Provider}}:::external
-    end
+  K2 -->|triggers| MF[Mainframe Job]
+  MF -->|reads from| AX
+  MF -->|transforms: remove '*'| MFOUT[Mainframe Downstream Outputs]
 
-    %% Connections (one per line)
-    WEB -->|HTTPS Request| LB
-    MOB -->|HTTPS Request| LB
-    CLI -->|HTTPS Request| LB
-    LB --> AG
-    AG -->|Authenticate| AUTH
-    AUTH --> USR
-    AG --> API
-    API --> USR
-    API --> ORD
-    ORD -->|Write| PG
-    USR -->|Read/Write| PG
-    USR -->|Cache Read/Write| REDIS
-    ORD -.->|Publish Event| KAFKA
-    KAFKA -.->|Subscribe| WRK
-    API -->|Upload| S3
-    ORD -->|Charge| STRP
-    API -->|Send Email| EMAIL
-    AG -->|OAuth Redirect| OAUTH
-
-    %% Link styles (0-based index in appearance order)
-    linkStyle 0 stroke:#0072B2,stroke-width:2.5px
-    linkStyle 1 stroke:#0072B2,stroke-width:2.5px
-    linkStyle 2 stroke:#0072B2,stroke-width:2.5px
-    linkStyle 3 stroke:#6366F1,stroke-width:2px
-    linkStyle 4 stroke:#D55E00,stroke-width:2px
-    linkStyle 5 stroke:#6366F1,stroke-width:2px
-    linkStyle 6 stroke:#6366F1,stroke-width:2px
-    linkStyle 7 stroke:#6366F1,stroke-width:2px
-    linkStyle 8 stroke:#6366F1,stroke-width:2px
-    linkStyle 9 stroke:#E69F00,stroke-width:2px
-    linkStyle 10 stroke:#E69F00,stroke-width:2px
-    linkStyle 11 stroke:#E69F00,stroke-width:2px
-    linkStyle 12 stroke:#009E73,stroke-width:2px,stroke-dasharray:5
-    linkStyle 13 stroke:#009E73,stroke-width:2px,stroke-dasharray:5
-    linkStyle 14 stroke:#F59E0B,stroke-width:2px
-    linkStyle 15 stroke:#CC79A7,stroke-width:2px
-    linkStyle 16 stroke:#CC79A7,stroke-width:2px
-    linkStyle 17 stroke:#CC79A7,stroke-width:2px
-
-    %% Optional subgraph styling for visual grouping
-    style CL fill:#DBEAFE,stroke:#93C5FD,stroke-width:2px
-    style GW fill:#F1F5F9,stroke:#CBD5E1,stroke-width:2px
-    style SVC fill:#F0F9FF,stroke:#BAE6FD,stroke-width:2px
-    style DATA fill:#FEF3C7,stroke:#FCD34D,stroke-width:2px
-    style EXT fill:#FCE7F3,stroke:#F9A8D4,stroke-width:2px
+  PQ --> CONS[Consumers (DHARMA, others)]
 ```
 
-## User Stories
+---
 
-**US-001: Implement Azure-hosted Connector Container Skeleton** [3pt] 🟠
-> As a platform engineer, I want I want to create a containerized connector skeleton with configurable scheduling, so that the connector can run in Azure as a scheduled pull process., so that Enable scheduled, Azure-hosted runs with a configurable polling interval (default 5 minutes) to minimize integration friction..
+## Required Enhancements (Mapped to Requirements)
 
+### 1) Support MD5 alongside SHA256
+
+* Add registry column: `checksum_type` ∈ { `MD5`, `SHA256` }
+* Pipeline selects checksum algorithm based on registry
+* Broadridge CashMgmt feed uses `checksum_type = MD5` (per Kafka-provided checksum)
+
+### 2) Parse `*`-enclosed fields/records
+
+* Add registry parsing configuration:
+
+  * `field_enclosure_char = '*'`
+  * `record_enclosure_char = '*'` (if applicable)
+  * retain delimiter-based parsing where required
+* Pipeline parsing supports:
+
+  * stripping enclosures safely
+  * handling malformed rows, empty fields, and unexpected enclosure patterns
+  * producing normalized dataset prior to Parquet write
+
+### 3) Axway deletion must be disabled / retention ensured
+
+* Today: file is deleted after MF pulls from Axway
+* Required: file must remain available so Data Mesh can also pull it
+* Options:
+
+  * **Preferred:** MF stops deleting OR Axway retention policy is adjusted
+  * **Fallback:** duplicate/copy strategy implemented so Mesh can pull reliably
+
+### 4) New Axway→Mesh Pull Pipeline
+
+Responsibilities:
+
+* Triggered by ESL Kafka notification
+* Pull from Axway, write to `datafiles/`
+* Generate Control File from Kafka metadata into `Controlfile/` (only after data file commit)
+* Handle retries and idempotency to avoid duplicate ingestion
+
+### 5) Kafka-trigger setup
+
+* Subscribe to ESL Kafka topic (post-Axway placement event)
+* Ensure:
+
+  * idempotency (duplicate messages)
+  * safe retry
+  * traceability using Kafka message IDs / correlation IDs
+
+### 6) Schema enforcement
+
+* Apply Broadridge schema file during Parquet creation:
+
+  * validate types and required fields
+  * reject/quarantine schema mismatches
+  * keep outputs consistent for new consumers
+
+### 7) Connectivity between Data Mesh and Axway
+
+* Network access + authentication method
+* Secrets managed securely (e.g., Key Vault)
+* Operational visibility (logs include Axway transfer IDs and Kafka correlation IDs)
+
+---
+
+## Registry Changes
+
+Add/extend these columns for feed configuration:
+
+* `checksum_type` (MD5/SHA256)
+* `delimiter` (existing)
+* `field_enclosure_char` (new, `*` for CashMgmt)
+* `record_enclosure_char` (new if needed)
+* `schema_file_path` (Broadridge schema location)
+* `source_system` = Broadridge
+* `trigger_source` = Kafka → Control File
+
+---
+
+## Idempotency & Error Handling
+
+### Idempotency
+
+* Idempotency key (recommended): `(filename + business_date + checksum)` or Kafka message ID
+* If duplicate Kafka message arrives:
+
+  * do not create duplicate Control File
+  * log as "duplicate ignored"
+
+### Control File rules
+
+* Control File is written **only after**:
+
+  * file is successfully copied to `datafiles/`
+  * data file is in final committed location
+* Control File contains at minimum:
+
+  * filename / file ID
+  * business date
+  * checksum value (from Kafka)
+  * checksum type (MD5/SHA256)
+  * record count (if provided, otherwise derived if required)
+
+### Failures
+
+Write structured failure records to `ingestion_errors/` for:
+
+* Axway pull failures
+* Kafka message parsing failures
+* checksum mismatches
+* schema enforcement failures
+* parsing failures (enclosure/delimiter issues)
+
+---
+
+## Epic-Level Acceptance Criteria
+
+* [ ] CashMgmt file ingests end-to-end into Data Mesh via Axway + Kafka trigger
+* [ ] Pipeline validates **MD5** for CashMgmt and retains **SHA256** for existing feeds
+* [ ] Parsing correctly handles `*`-enclosed data and produces correct Parquet output
+* [ ] Broadridge schema is enforced; schema failures quarantine and are reported
+* [ ] Axway retention/deletion behavior is modified so MF and Mesh can both access the file
+* [ ] Mainframe job remains unchanged and continues to run successfully
+* [ ] Duplicate Kafka notifications do not cause duplicate ingestion
+
+---
+
+## User Stories (Fibonacci, max 5 points each)
+
+### Trigger + Pull Pipeline
+
+**US-001: Subscribe to ESL Kafka notification topic** [3pt]
 Acceptance Criteria:
-- [ ] Connector runs as a Docker image and starts without error in a local container environment
-- [ ] Configurable polling interval is supported via environment variable; when set to 5 minutes the process initiates a poll within ±30 seconds of each 5-minute boundary in an integration test
-- [ ] Container exposes /health and /ready endpoints returning HTTP 200 within 1s when dependencies are reachable
-- [ ] Dockerfile and container image are present in repository and can be built locally with a single make/build command
 
-**US-002: Implement Axway Poll-and-Download Logic** [3pt] 🟠
-> As a backend developer, I want I want to implement scheduled polling of Axway and download transfers to a transient staging location, so that data files are reliably retrieved for processing., so that Ensure connector can fetch files from Axway and place them in transient staging for downstream verification, reducing missed transfers..
+* [ ] Consumer reads ESL topic in DEV/QA
+* [ ] Required fields extracted: filename, business date, checksum (MD5), correlation ID
+* [ ] Invalid messages routed to `ingestion_errors/`
 
+**US-002: Establish Data Mesh ↔ Axway connectivity and authentication** [5pt]
 Acceptance Criteria:
-- [ ] Connector successfully lists available Axway transfers using configured credentials and logs transfer IDs
-- [ ] Connector downloads a sample transfer to a local transient staging path and the downloaded file size matches Axway-reported size
-- [ ] Downloaded files are written to a configurable transient path and a manifest entry (transfer ID, local path, timestamp) is recorded in logs
 
-**US-003: Compute and Verify Local SHA256 Checksum** [2pt] 🟠
-> As a backend developer, I want I want to compute SHA256 for downloaded files and validate integrity, so that only verified files proceed to upload and the pipeline's SHA256 check will pass., so that Prevent publishing control files for corrupted downloads; ensure connector-provided checksum matches pipeline validation..
+* [ ] Axway connection works in DEV and QA
+* [ ] Secrets stored securely (Key Vault or approved mechanism)
+* [ ] Connectivity failures logged with correlation ID
 
+**US-003: Implement Axway→Mesh file pull and write to `datafiles/`** [5pt]
 Acceptance Criteria:
-- [ ] Connector computes SHA256 of any downloaded file and stores the value in the local manifest
-- [ ] If computed SHA256 matches an optional Axway-provided checksum or expected value, the file is marked verified and eligible for upload
-- [ ] If SHA256 verification fails, the file is moved to a configurable quarantine location and no Control File is uploaded; a quarantine record is written to ingestion_errors/ including transfer ID and checksum mismatch reason
 
-**US-004: Upload Data Files With Atomic Commit** [3pt] 🟠
-> As a platform engineer, I want I want to upload verified data files to datafiles/ using a temporary name and then atomically commit via copy-then-delete, so that downstream pipeline sees only fully uploaded files., so that Avoid partially visible blobs in datafiles/ and ensure pipeline trigger semantics are preserved..
+* [ ] File lands in `datafiles/` with correct final name
+* [ ] Partial/incomplete file is never visible as final (staging → commit)
+* [ ] Retries are safe (no duplicates)
 
+**US-004: Generate Control File from Kafka metadata and publish to `Controlfile/`** [3pt]
 Acceptance Criteria:
-- [ ] Verified data file is uploaded to blob container under datafiles/ with a temporary filename (e.g., .tmp suffix)
-- [ ] Connector performs copy-then-delete to create the final filename in datafiles/ and deletes the temporary object; after operation only final filename exists
-- [ ] Final blob has the same SHA256 as the locally computed checksum and the temporary blob is removed within 60 seconds of successful commit
 
-**US-005: Generate and Publish Control File Post-commit** [2pt] 🟠
-> As a backend developer, I want I want to generate a single-record Control File matching the existing schema and upload it to Controlfile directory only after data commit, so that the existing ingestion pipeline is triggered correctly., so that Maintain pipeline compatibility and avoid false triggers; ensure control file contains accurate metadata (Checksum, Count, BusinessDate, FileID)..
+* [ ] Control file includes filename/fileId, business date, checksum value, checksum type, count (if available/required)
+* [ ] Control file is created only after data file commit
+* [ ] Duplicate Kafka notification does not create duplicate control file
 
+### Pipeline + Registry Enhancements
+
+**US-005: Add `checksum_type` to registry and configure CashMgmt as MD5** [2pt]
 Acceptance Criteria:
-- [ ] Control File is uploaded to Controlfile/ only after the corresponding data file final blob exists and its checksum is verified
-- [ ] Control File contains fields Count, Business Date, Checksum, and unique FileID; a JSON or CSV schema validation script returns valid for the generated control file
-- [ ] Checksum value in the Control File equals the locally computed SHA256 and pipeline mock validation accepts the Control File
 
-**US-006: Implement Blob-lease Based Concurrency Locking** [2pt] 🟠
-> As a platform engineer, I want I want to coordinate multiple connector instances using blob-lease locks, so that only one instance processes a given Axway transfer batch at a time., so that Prevent duplicate downloads/uploads and race conditions when multiple connector instances are running..
+* [ ] Registry supports MD5/SHA256 values
+* [ ] CashMgmt feed configured as MD5
+* [ ] Existing feeds default/continue as SHA256
 
+**US-006: Implement MD5 checksum validation path in ingestion pipeline** [5pt]
 Acceptance Criteria:
-- [ ] Connector acquires an Azure blob lease for a transfer batch before processing and releases it after completion
-- [ ] When a second connector instance attempts to process the same transfer while lease is held, it skips processing and logs 'lease held' with the lease owner ID
-- [ ] Integration test demonstrates only one instance processes the same transfer ID when two instances start concurrently
 
-**US-007: Log Errors To ingestion_errors Blob Path** [2pt] 🟠
-> As a backend developer, I want I want to write structured error records to ingestion_errors/ with Axway IDs and failure reasons, so that failures are traceable and can be investigated., so that Provide operational visibility: every download/upload/checksum failure is recorded with transfer ID and error details for troubleshooting..
+* [ ] When registry says MD5, pipeline computes MD5 and matches against control/Kafka value
+* [ ] When registry says SHA256, behavior remains unchanged
+* [ ] Mismatch triggers quarantine + `ingestion_errors/` record
 
+**US-007: Add parsing support for `*`-enclosed fields/records** [5pt]
 Acceptance Criteria:
-- [ ] On any download, checksum, or upload failure a JSON error record is written to ingestion_errors/ with fields: transferID, timestamp, operation, errorCode, errorMessage, and attempted blob paths
-- [ ] Error records are written within 30 seconds of failure and are queryable via blob listing; at least one sample error is present after a simulated failure test
-- [ ] Connector does not publish a Control File for any transfer that has an associated error record
 
-**US-008: Add Health, Readiness, and Metrics Endpoints** [2pt] 🟡
-> As a platform engineer, I want I want to add /health and /ready endpoints plus basic Prometheus metrics, so that platform monitoring and alerting can consume connector status and basic SLI counters., so that Enable automated monitoring: health endpoints return dependency status and metrics expose counts for successful transfers and failures..
+* [ ] Strips enclosure correctly and outputs expected normalized values
+* [ ] Handles empty/malformed rows with clear error reporting
+* [ ] Golden-file test validates parsing output
 
+**US-008: Add registry config for enclosure characters** [2pt]
 Acceptance Criteria:
-- [ ] /health returns HTTP 200 when the process is running; /ready returns HTTP 200 only when Azure Blob and Axway endpoints are reachable (simulated during tests)
-- [ ] Prometheus-compatible metrics endpoint (/metrics) exposes at minimum counters: transfers_processed_total and transfers_failed_total
-- [ ] Health and metrics endpoints respond within 500ms under normal conditions
 
-**US-009: Add Automated Tests For Core Flows** [3pt] 🟠
-> As a backend developer, I want I want to add unit and integration tests for download, SHA256 verification, atomic upload, and control-file generation, so that connector behavior is validated in CI., so that Reduce regressions by verifying at least success, checksum-failure, and upload-failure cases in automated tests..
+* [ ] Registry supports `field_enclosure_char` and `record_enclosure_char`
+* [ ] Pipeline routes parsing based on registry config
 
+**US-009: Enforce Broadridge schema file during Parquet write** [3pt]
 Acceptance Criteria:
-- [ ] Automated unit tests cover checksum computation and control-file format validation with ≥90% pass on those modules
-- [ ] Integration tests simulate three scenarios (successful end-to-end, checksum failure leading to quarantine, upload failure leading to error record) and succeed in a CI job
-- [ ] Tests run in CI and produce pass/fail results; failing tests block merge
 
-**US-010: Create CI/CD Pipeline For Connector Deployment** [3pt] 🟠
-> As a platform engineer, I want I want to create a CI/CD pipeline that builds the connector image, pushes to ACR, and deploys to a staging target, so that changes can be continuously delivered to Azure., so that Ensure repeatable, automated builds and deployments; verify end-to-end deployability to an Azure staging environment..
+* [ ] Loads schema file from `schema_file_path`
+* [ ] Type/required-field enforcement applied
+* [ ] Schema violations quarantine and are logged
 
+### Retention / Operational
+
+**US-010: Modify Axway deletion/retention so Mesh can pull after MF** [5pt]
 Acceptance Criteria:
-- [ ] CI pipeline builds Docker image on merge to main, pushes image to Azure Container Registry, and creates or updates a staging deployment (ACI/App Service/K8s) with the new image
-- [ ] A successful pipeline run results in a deployed instance that responds to /health with HTTP 200 within 60 seconds of deployment completion
-- [ ] Pipeline includes a job that runs the integration tests (from US-009) and fails the deployment if tests fail
+
+* [ ] File remains accessible to Mesh after MF consumes
+* [ ] Retention window documented and agreed
+* [ ] No impact to MF processing
+
+**US-011: Add correlation IDs across Kafka→Pull→Ingestion logs** [3pt]
+Acceptance Criteria:
+
+* [ ] Kafka correlation ID appears in pull pipeline logs and ingestion pipeline logs
+* [ ] `ingestion_errors/` includes correlation ID + Axway identifiers
+
+**US-012: Automated end-to-end test for CashMgmt ingestion** [5pt]
+Acceptance Criteria:
+
+* [ ] Covers Kafka trigger → Axway pull → control file → ingestion → parquet output
+* [ ] Verifies MD5 validation + schema enforcement + parsing correctness
+* [ ] Test blocks merge/deploy if failing
+
+---
+
+## Dependencies
+
+1. Kafka topic access/ACLs for ESL notifications
+2. Axway connectivity approval + credentials provisioning
+3. Axway deletion disabled or retention policy implemented
+4. Broadridge schema file provided + stable location
+5. Registry deployment process aligned with pipeline rollout
+
+---
+
+## Risks & Mitigations
+
+| Risk                                 | Impact | Mitigation                                                          |
+| ------------------------------------ | ------ | ------------------------------------------------------------------- |
+| Axway file deleted before Mesh pull  | High   | Disable deletion / retention window / fallback duplication strategy |
+| Kafka duplicates/out-of-order events | Medium | Idempotency key + control file dedupe                               |
+| Incorrect parsing of `*` enclosures  | High   | Golden test vectors + strict validation + quarantine                |
+| Schema mismatches break consumers    | Medium | Schema enforcement + quarantine + reporting                         |
+| MD5 vs SHA256 confusion across feeds | Medium | Registry-driven logic + clear defaults + automated tests            |
