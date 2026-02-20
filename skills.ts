@@ -15,6 +15,7 @@ import {
   type RefinementOutput,
   type MandatoryOutput,
   type PipelineResult,
+  type PipelineStage,
   type PipelineRefinedSection,
   type PipelineUserStory,
   type CoverageReport,
@@ -25,6 +26,17 @@ import {
   type DiscoveredSection,
   type AnalyzedSection,
   type AssembledEpic,
+  type ExtractedRequirement,
+  type RequirementGap,
+  type TraceabilityRow,
+  type AuditCheckItem,
+  type DetectedFailure,
+  type ValidationOutput,
+  type DeterministicScoreBreakdown,
+  type SectionFeedbackItem,
+  type StoryFeedbackItem,
+  type IterationFeedback,
+  type StoryPointCorrection,
   type SkillName,
   type SkillExecution,
   type AgentProgress,
@@ -651,6 +663,42 @@ function buildUserPrompt(
 // Small delay for UI feedback
 const mockDelay = () => new Promise(resolve => setTimeout(resolve, 300));
 
+/**
+ * Sanitize projectName for use as document title.
+ * Ensures the H1 heading is a proper short title, not a long sentence or truncated text.
+ * - If <=60 chars and <=8 words, keep as-is
+ * - Otherwise truncate to 8 words / 60 chars, removing trailing incomplete words
+ */
+export function sanitizeProjectName(name: string): string {
+  const trimmed = name.trim();
+  const words = trimmed.split(/\s+/);
+
+  // Already a reasonable title
+  if (trimmed.length <= 60 && words.length <= 8) {
+    // Still check for single-char trailing word (truncation artifact)
+    if (words.length > 1 && words[words.length - 1].length <= 1) {
+      return words.slice(0, -1).join(' ');
+    }
+    return trimmed;
+  }
+
+  // Truncate to first 8 words
+  let sanitized = words.slice(0, 8).join(' ');
+  if (sanitized.length > 60) {
+    sanitized = sanitized.substring(0, 60);
+    // Remove trailing partial word
+    const lastSpace = sanitized.lastIndexOf(' ');
+    if (lastSpace > 10) {
+      sanitized = sanitized.substring(0, lastSpace);
+    }
+  }
+
+  // Remove trailing single-char word (truncation artifact like "e" or "a")
+  sanitized = sanitized.replace(/\s+\S{1,2}$/, '').trim();
+
+  return sanitized || 'Untitled Project';
+}
+
 // Get diagram node for a field (used for Blueprint tab)
 function getDiagramNode(fieldName: string, content: string): string {
   const diagramNodes: Record<string, string> = {
@@ -814,8 +862,11 @@ async function refineInput(
 async function generateEpic(data: RefinedData, projectName: string, blueprintCode?: string): Promise<GenerateResult> {
   await mockDelay();
 
-  // Build the epic document - use project name as title
-  let epic = `# ${projectName}\n\n`;
+  // Sanitize project name for H1 title — prevent sentence-as-title and truncation
+  const title = sanitizeProjectName(projectName);
+
+  // Build the epic document — document identity comes after context sections (not at top)
+  let epic = `# ${title}\n\n`;
   epic += `*Generated on ${new Date().toLocaleDateString()}*\n\n---\n\n`;
 
   // Generate each section
@@ -866,6 +917,16 @@ async function generateEpic(data: RefinedData, projectName: string, blueprintCod
         .filter(Boolean)
         .join('\n\n') || '_To be defined_';
       epic += `${content}\n\n`;
+    }
+
+    // Insert Epic Status after context sections (Objective, Background, Scope, Assumptions)
+    // Readers need project context before seeing status metadata
+    if (section.num === 4) {
+      epic += `## Epic Status\n\n`;
+      epic += `| Field | Value |\n|---|---|\n`;
+      epic += `| **Status** | Draft |\n`;
+      epic += `| **Owner** | _TBD_ |\n`;
+      epic += `| **Last Updated** | ${new Date().toLocaleDateString()} |\n\n`;
     }
   }
 
@@ -1612,7 +1673,7 @@ CRITICAL: Analyze the epic content and select the diagram type that best represe
 | Hierarchical concepts, brainstorming, categories | concept, idea, category, topic, overview, breakdown | Block Diagram | block-beta |
 | Chronological events, history, milestones | timeline, history, event, year, milestone, era | Timeline | timeline |
 | Priority matrix, comparison on two axes | priority, impact, effort, urgency, quadrant, matrix | Quadrant Chart | quadrantChart |
-| Flow quantities, conversions, budget allocation | flow, conversion, funnel, allocation, transfer, from/to | Sankey Diagram | sankey-beta |
+| Numeric flow quantities with specific amounts, budget allocation, conversion funnels with percentages | conversion rate, budget, allocation, revenue, cost, percentage, funnel metrics | Sankey Diagram | sankey-beta |
 | Multi-dimensional comparison, skills, ratings | compare, rating, score, skill, dimension, radar | Radar Chart | radar-beta |
 | Proportional distribution, percentages, shares | percentage, distribution, share, breakdown, pie | Pie Chart | pie |
 | Data trends, metrics over time, statistics | trend, metric, chart, data, x-axis, y-axis | XY Chart | xychart-beta |
@@ -1628,10 +1689,10 @@ Apply these rules in order:
 3. If content describes STATE TRANSITIONS or lifecycle → stateDiagram-v2
 4. If content describes PROJECT SCHEDULE with dates → gantt
 5. If content describes GIT WORKFLOW → gitGraph
-6. If content describes HIERARCHICAL CONCEPTS → block-beta (structured block diagram)
-7. If content describes FLOW QUANTITIES between sources → sankey-beta
-8. If content describes PRIORITY/COMPARISON on two axes → quadrantChart
-9. If content describes SYSTEM COMPONENTS and their connections → flowchart LR (architecture)
+6. If content describes SYSTEM COMPONENTS, services, APIs, data pipelines, or their connections → flowchart LR (architecture). This includes data pipelines, microservices, integration architectures, and any project with named systems that interact.
+7. If content describes HIERARCHICAL CONCEPTS with no clear data flow → block-beta (structured block diagram)
+8. If content describes NUMERIC FLOW QUANTITIES with specific amounts/percentages between sources → sankey-beta. NOTE: Do NOT use sankey for data pipelines — use flowchart LR instead. Sankey is ONLY for numeric quantity flows (budget allocation, conversion funnels with percentages).
+9. If content describes PRIORITY/COMPARISON on two axes → quadrantChart
 10. When genuinely uncertain → flowchart LR (most versatile)
 
 ### Step 1.3 — Assess Complexity Budget
@@ -2158,115 +2219,37 @@ flowchart LR
 
 ---
 
-## PHASE 9: ARCHITECTURAL LAYERS (for Architecture Diagrams)
+## PHASE 9: CONTENT-DRIVEN ARCHITECTURE (CRITICAL)
 
-Organize left-to-right (LR) or top-to-bottom (TB):
+IMPORTANT: The diagram MUST represent the ACTUAL system described in the project content. Do NOT use generic template components.
 
-### Layer 1: Client Layer
-- Web apps, SPAs, mobile apps
-- CLI tools, desktop apps
+Rules:
+1. ONLY include components, services, and systems that are EXPLICITLY mentioned in the project content
+2. If the project is a data pipeline, show the data pipeline components (not "Web App" or "Mobile App")
+3. If the project mentions Kafka, Axway, SFTP, Azure — show THOSE specific systems
+4. If the project does NOT mention "Stripe", "SendGrid", "OAuth Provider" — do NOT include them
+5. Read the project content carefully and extract the actual flow: what sends data where, what triggers what, what stores what
+6. Use the exact names from the project content (e.g., "ESL Service", "MF Job", "Broadridge") not generic names
+7. Show the actual data flow described by the user, not a hypothetical web application architecture
 
-### Layer 2: Gateway Layer
-- Load balancers, API gateways
-- Auth, rate limiting
-
-### Layer 3: Service Layer
-- Microservices, business logic
-- Background workers
-
-### Layer 4: Data Layer
-- Databases (PostgreSQL, MySQL, MongoDB)
-- Caches (Redis, Memcached)
-- Queues (Kafka, RabbitMQ)
-- Search (Elasticsearch)
-- Storage (S3)
-
-### Layer 5: External Layer
-- Payment (Stripe, PayPal)
-- Email (SendGrid)
-- Third-party APIs
+Organization:
+- Group related components into logical subgraphs based on the project's actual architecture
+- Use left-to-right (LR) for data flow pipelines, top-to-bottom (TB) for hierarchical systems
+- Label connections with the actual data/protocol described (e.g., "Kafka notification", "SFTP pull", "file copy")
 
 ---
 
-## PHASE 10: COMPLETE ARCHITECTURE EXAMPLE (UBS Brand)
+## PHASE 10: DIAGRAM CONTENT WARNING
 
-\`\`\`
-%%{init: {
-  'theme': 'base',
-  'themeVariables': {
-    'primaryColor': '#E60000',
-    'primaryTextColor': '#FFFFFF',
-    'primaryBorderColor': '#BD000C',
-    'secondaryColor': '#5A5D5C',
-    'lineColor': '#5A5D5C',
-    'clusterBkg': '#ECEBE4',
-    'clusterBorder': '#E5E5E5'
-  }
-}}%%
-flowchart LR
-    subgraph CL["Clients"]
-        WEB[Web App]
-        MOB[Mobile App]
-    end
-    
-    subgraph GW["Gateway"]
-        LB[Load Balancer]
-        AG[API Gateway]
-        AUTH[Auth Service]
-    end
-    
-    subgraph SVC["Services"]
-        USER[User Service]
-        ORD[Order Service]
-        PAY[Payment Service]
-    end
-    
-    subgraph DATA["Data Layer"]
-        PG[(PostgreSQL)]
-        REDIS[(Redis)]
-        KAFKA([Kafka])
-    end
-    
-    subgraph EXT["External"]
-        STRIPE{{Stripe}}
-    end
-    
-    WEB --> LB
-    MOB --> LB
-    LB --> AG
-    AG --> AUTH
-    AUTH --> USER
-    AG --> ORD
-    ORD --> PAY
-    PAY --> STRIPE
-    ORD -.-> KAFKA
-    USER --> PG
-    ORD --> PG
-    USER --> REDIS
+**CRITICAL: Do NOT copy the syntax examples above as your diagram content.**
 
-    linkStyle 0,1 stroke:#BD000C,stroke-width:2.5px
-    linkStyle 2 stroke:#5A5D5C,stroke-width:2px
-    linkStyle 3 stroke:#BD000C,stroke-width:2px
-    linkStyle 4 stroke:#BD000C,stroke-width:2px
-    linkStyle 5,6 stroke:#8E8D83,stroke-width:2px
-    linkStyle 7 stroke:#E60000,stroke-width:2px
-    linkStyle 8 stroke:#5A5D5C,stroke-width:2px,stroke-dasharray:5
-    linkStyle 9,10 stroke:#CCCABC,stroke-width:2px
-    linkStyle 11 stroke:#CCCABC,stroke-width:2px
+The examples in earlier phases (Web App, Mobile App, Stripe, etc.) are ONLY to show Mermaid SYNTAX formatting. Your actual diagram MUST contain ONLY components from the project content provided in the user prompt.
 
-    style WEB fill:#E60000,stroke:#BD000C,color:#fff
-    style MOB fill:#E60000,stroke:#BD000C,color:#fff
-    style LB fill:#5A5D5C,stroke:#000000,color:#fff
-    style AG fill:#5A5D5C,stroke:#000000,color:#fff
-    style AUTH fill:#BD000C,stroke:#000000,color:#fff
-    style USER fill:#8E8D83,stroke:#5A5D5C,color:#fff
-    style ORD fill:#8E8D83,stroke:#5A5D5C,color:#fff
-    style PAY fill:#8E8D83,stroke:#5A5D5C,color:#fff
-    style PG fill:#CCCABC,stroke:#8E8D83,color:#000
-    style REDIS fill:#CCCABC,stroke:#8E8D83,color:#000
-    style KAFKA fill:#5A5D5C,stroke:#000000,color:#fff
-    style STRIPE fill:#E60000,stroke:#BD000C,color:#fff
-\`\`\`
+If the project describes a data pipeline with Kafka, SFTP, Azure containers → show THOSE components.
+If the project describes a microservices migration → show THOSE services.
+NEVER include generic components (Web App, Mobile App, Stripe, SendGrid, OAuth) unless the project explicitly mentions them.
+
+Read the project content. Extract the actual systems, services, data stores, and flows. Build the diagram from THOSE.
 
 ---
 
@@ -2301,6 +2284,15 @@ flowchart LR
 [ ] Async flows use dashed lines
 [ ] Databases use cylinder shape
 [ ] External services use hexagon shape
+
+---
+
+## STEP 3B — ARCHITECTURE DIAGRAM RULES (mandatory)
+
+- **Source-faithful only**: Every node MUST correspond to a system, service, component, data store, queue, or integration point explicitly mentioned in the source epic. No node may be added because "most systems have one" or because a template includes it. Self-test: for every node, ask "Where in the source is this mentioned?" If you cannot point to a specific phrase, the node does not belong.
+- **Admit gaps rather than fake**: If the source doesn't describe enough components, write a note in the diagram rather than inventing nodes.
+- **Naming consistency**: Diagram node labels MUST match the terminology used in the document body. If the document says "Ingestion Pipeline", the diagram says "Ingestion Pipeline" — not "PIPE" or "Service A".
+- **Flow direction must match**: The actual data/process flow described in the source. Do not force a flowchart on a system integration or vice versa.
 
 ---
 
@@ -2418,11 +2410,11 @@ function validateMermaidDiagram(mermaid: string): string {
   }
 
   // Fix common issues
-  
+
   // Fix lowercase "end" that breaks parsing (but not "End" or "END")
   mermaid = mermaid.replace(/\[end\]/g, '[Finish]');
   mermaid = mermaid.replace(/\(end\)/g, '(Finish)');
-  
+
   // Remove any trailing content after diagram
   const endMarkers = ['TYPE:', 'REASONING:', '---'];
   for (const marker of endMarkers) {
@@ -2432,6 +2424,36 @@ function validateMermaidDiagram(mermaid: string): string {
     }
   }
 
+  // Bug #4 fix: Validate and fix linkStyle index mismatches
+  // Count all connections (arrows) in the diagram
+  const arrowPatterns = /(-->|-.->|==>|--x|--o|~~~|--\|[^|]*\|-->|==\|[^|]*\|==>)/g;
+  const connectionCount = (mermaid.match(arrowPatterns) || []).length;
+
+  // Find all linkStyle declarations and check indices
+  const linkStyleLines = mermaid.match(/^\s*linkStyle\s+.+$/gm) || [];
+  if (linkStyleLines.length > 0 && connectionCount > 0) {
+    // Extract all referenced indices (including comma-separated like "linkStyle 0,1")
+    let maxIndex = -1;
+    for (const line of linkStyleLines) {
+      const indexMatch = line.match(/linkStyle\s+([\d,\s]+)/);
+      if (indexMatch) {
+        const indices = indexMatch[1].split(',').map(s => parseInt(s.trim()));
+        for (const idx of indices) {
+          if (idx > maxIndex) maxIndex = idx;
+        }
+      }
+    }
+
+    // If any linkStyle index >= connection count, strip ALL linkStyle to prevent render failure
+    if (maxIndex >= connectionCount) {
+      console.warn(`[validateMermaid] linkStyle index ${maxIndex} exceeds connection count ${connectionCount}. Stripping all linkStyle declarations.`);
+      mermaid = mermaid.replace(/^\s*linkStyle\s+.+$/gm, '').replace(/\n{3,}/g, '\n\n');
+    }
+  } else if (linkStyleLines.length > 0 && connectionCount === 0) {
+    // linkStyle present but no connections found — strip to be safe
+    mermaid = mermaid.replace(/^\s*linkStyle\s+.+$/gm, '').replace(/\n{3,}/g, '\n\n');
+  }
+
   return mermaid;
 }
 
@@ -2439,26 +2461,26 @@ function validateMermaidDiagram(mermaid: string): string {
 function buildEpicSummary(data: RefinedData, projectName: string): string {
   let summary = `Project: ${projectName}\n\n`;
 
-  if (data['objective']?.original) {
-    summary += `OBJECTIVE:\n${data['objective'].original}\n\n`;
+  // Primary fields (wizard-based)
+  const primaryFields = ['objective', 'architectureOverview', 'features', 'userStories', 'dataStores', 'teams', 'environments'];
+  for (const field of primaryFields) {
+    if (data[field]?.original) {
+      summary += `${field.toUpperCase()}:\n${data[field].original}\n\n`;
+    }
   }
-  if (data['architectureOverview']?.original) {
-    summary += `ARCHITECTURE:\n${data['architectureOverview'].original}\n\n`;
+
+  // Include ALL other content from the epic — critical for non-wizard epics
+  // (data pipeline projects, integration specs, etc. have sections that don't map to wizard fields)
+  for (const [key, value] of Object.entries(data)) {
+    if (!primaryFields.includes(key) && value?.original && value.original.length > 20) {
+      const sectionName = key.replace(/([A-Z])/g, ' $1').trim().toUpperCase();
+      summary += `${sectionName}:\n${value.original.substring(0, 1500)}\n\n`;
+    }
   }
-  if (data['features']?.original) {
-    summary += `FEATURES:\n${data['features'].original}\n\n`;
-  }
-  if (data['userStories']?.original) {
-    summary += `USER STORIES:\n${data['userStories'].original}\n\n`;
-  }
-  if (data['dataStores']?.original) {
-    summary += `DATA STORES:\n${data['dataStores'].original}\n\n`;
-  }
-  if (data['teams']?.original) {
-    summary += `TEAMS:\n${data['teams'].original}\n\n`;
-  }
-  if (data['environments']?.original) {
-    summary += `ENVIRONMENTS:\n${data['environments'].original}\n\n`;
+
+  // Hard cap to avoid exceeding token limits
+  if (summary.length > 8000) {
+    summary = summary.substring(0, 8000) + '\n...(truncated)';
   }
 
   return summary;
@@ -2948,7 +2970,9 @@ RULES:
 5. Ensure all labels are properly quoted with double quotes if they contain special characters
 6. Fix any invalid arrow syntax or subgraph definitions
 7. Ensure subgraphs have proper opening and closing
-8. Do NOT include markdown code fences like \`\`\`mermaid or \`\`\``;
+8. Do NOT include markdown code fences like \`\`\`mermaid or \`\`\`
+9. If the error involves linkStyle index mismatch: DELETE ALL linkStyle declarations entirely. Do NOT attempt to reindex them.
+10. DO NOT use linkStyle declarations unless the diagram is very simple (3 or fewer connections). Unstyled is the correct default.`;
 
   const userPrompt = `ERROR MESSAGE:
 ${errorMessage}
@@ -3433,13 +3457,24 @@ export interface ParsedUserStory {
 export function parseUserStoriesFromEpic(epicContent: string): ParsedUserStory[] {
   const stories: ParsedUserStory[] = [];
 
-  // Find the User Stories section (Section 11 or ### User Stories subsection)
-  const section11Match = epicContent.match(/##\s*11\.\s*Key Features\s*&?\s*User Stories[\s\S]*?(?=##\s*\d+\.|$)/i);
-  const userStoriesMatch = epicContent.match(/###?\s*User Stories[\s\S]*?(?=###?\s*[A-Z]|##\s*\d+\.|$)/i);
+  // Find the User Stories section — supports multiple formats:
+  //   1. "## 11. Key Features & User Stories" (wizard format)
+  //   2. "## User Stories" or "### User Stories" (pipeline format, no number)
+  //   3. "## N. User Stories" (pipeline format with auto-number)
+  //   4. "## N. Key Features & User Stories" (any number, not just 11)
+  const section11Match = epicContent.match(/##\s*\d+\.\s*(?:Key Features\s*&?\s*)?User Stories[\s\S]*?(?=\n##\s|$)/i);
+  // NOTE: Termination must NOT include ### sub-headers — those are INSIDE the User Stories section
+  // (e.g., "### Infrastructure & Operational"). Only stop at ## section-level headers.
+  const userStoriesMatch = epicContent.match(/###?\s*(?:\d+\.\s*)?User Stories[\s\S]*?(?=\n##\s*\d+\.|\n##\s[A-Z]|$)/i);
 
   if (!section11Match && !userStoriesMatch) {
-    console.log('[parseUserStories] No user stories section found');
-    return stories;
+    // Fallback: search the entire document for story patterns (no section header needed)
+    const hasStoryPatterns = /\*\*[A-Z]{2,3}-\d+:/.test(epicContent) || /As an?\s+[^,]+,?\s*I\s+want\s+/i.test(epicContent);
+    if (!hasStoryPatterns) {
+      console.log('[parseUserStories] No user stories section found');
+      return stories;
+    }
+    console.log('[parseUserStories] No section header found, searching entire document');
   }
 
   const sectionContent = userStoriesMatch ? userStoriesMatch[0] : (section11Match ? section11Match[0] : epicContent);
@@ -3447,15 +3482,28 @@ export function parseUserStoriesFromEpic(epicContent: string): ParsedUserStory[]
   // Pattern 1 (NEW FORMAT): **US-XXX: Professional Title** with blockquote story
   // Matches: **US-001: Implement MFA Authentication** 🔴
   //          > As a user, I want to enable multi-factor authentication, so that my account is secure.
-  const newFormatPattern = /\*\*([A-Z]{2,3}-\d+):\s*([^*]+)\*\*[^\n]*\n>\s*As an?\s+([^,]+),?\s*I\s+want\s+([^,]+?)(?:,?\s*so\s+that\s+([^.\n]+))?/gi;
+  // NOTE: Title uses (.*?) to handle backtick-code with * inside (e.g., `*`-enclosed).
+  // Goal uses (.+?) (non-greedy, allows commas) anchored by [.\n] at end.
+  const newFormatPattern = /\*\*([A-Z]{2,3}-\d+):\s*(.*?)\*\*[^\n]*\n>\s*As an?\s+([^,]+),?\s*I\s+want\s+(.+?)(?:,?\s*so\s+that\s+([^.\n]+))?[.\n]/gi;
+
+  // Helper: strip assembly artifacts from parsed text (e.g., trailing **, [Req #N] tags)
+  function cleanArtifacts(text: string): string {
+    return text
+      .replace(/\*{1,2}\s*/g, '')         // strip stray * or **
+      .replace(/\s*\[Req\s*#\d+(?:,\s*Req\s*#\d+)*\]/gi, '') // strip [Req #N] tags
+      .trim();
+  }
 
   let match;
   while ((match = newFormatPattern.exec(sectionContent)) !== null) {
     const storyId = match[1]?.trim();           // US-001
-    const title = match[2]?.trim();              // Implement MFA Authentication
+    const title = cleanArtifacts(match[2]?.trim() || '');
     const persona = match[3]?.trim();            // user
-    const goal = match[4]?.trim();               // enable multi-factor authentication
+    const goal = cleanArtifacts(match[4]?.trim() || '');
     const benefit = match[5]?.trim();            // my account is secure
+
+    // Skip garbage stories (empty or very short titles)
+    if (!title || title.length < 5) continue;
 
     const rawText = `As a ${persona}, I want ${goal}${benefit ? `, so that ${benefit}` : ''}.`;
 
@@ -3477,8 +3525,67 @@ export function parseUserStoriesFromEpic(epicContent: string): ParsedUserStory[]
     return stories;
   }
 
+  // Pattern 1.5 (TITLE + BULLETS FORMAT): **US-XX: Title** [optional metadata]\n- bullet\n- bullet
+  // Common when Stage 4 auto-generates User Stories section or Stage 5B returns 0 stories.
+  // Groups bullets under their parent title instead of treating each bullet as a separate story.
+  const titleHeaderPattern = /\*\*([A-Z]{2,3}-\d+):\s*([^*]+)\*\*/g;
+  const titlePositions: Array<{ id: string; title: string; startIdx: number }> = [];
+  while ((match = titleHeaderPattern.exec(sectionContent)) !== null) {
+    titlePositions.push({
+      id: match[1].trim(),
+      title: match[2].trim(),
+      startIdx: match.index + match[0].length
+    });
+  }
+
+  if (titlePositions.length >= 2) {
+    console.log(`[parseUserStories] Found ${titlePositions.length} title headers, using title+bullets pattern`);
+    for (let i = 0; i < titlePositions.length; i++) {
+      const { id: storyId, title: storyTitle, startIdx } = titlePositions[i];
+      const endIdx = i + 1 < titlePositions.length
+        ? sectionContent.lastIndexOf('**', titlePositions[i + 1].startIdx - titlePositions[i + 1].title.length - 10)
+        : sectionContent.length;
+      const contentBlock = sectionContent.substring(startIdx, endIdx).trim();
+
+      // Try to extract "As a... I want..." from the content block if present
+      const asAMatch = contentBlock.match(/As an?\s+([^,]+),?\s*I\s+want\s+(.+?)(?:,?\s*so\s+that\s+([^.\n]+))?[.\n]/i);
+      const persona = asAMatch ? asAMatch[1]?.trim() : undefined;
+      const goal = asAMatch ? asAMatch[2]?.trim() : undefined;
+      const benefit = asAMatch ? asAMatch[3]?.trim() : undefined;
+
+      // Collect bullet points as description
+      const bullets = contentBlock.match(/[-*]\s+[^\n]+/g) || [];
+      const bulletText = bullets.map(b => b.trim()).join('\n');
+
+      const rawText = asAMatch
+        ? `As a ${persona}, I want ${goal}${benefit ? `, so that ${benefit}` : ''}.`
+        : bulletText || storyTitle;
+
+      const description = asAMatch
+        ? `**User Story**\n\n${rawText}\n\n**Acceptance Criteria:**\n${bulletText}`
+        : `**${storyTitle}**\n\n${bulletText || contentBlock}`;
+
+      stories.push({
+        id: storyId || `US-${String(stories.length + 1).padStart(3, '0')}`,
+        rawText,
+        title: storyTitle.length > 100 ? storyTitle.slice(0, 97) + '...' : storyTitle,
+        description,
+        persona,
+        goal,
+        benefit,
+        hasExistingIssue: false
+      });
+    }
+
+    if (stories.length > 0) {
+      console.log(`[parseUserStories] Found ${stories.length} stories (title + bullets format)`);
+      return stories;
+    }
+  }
+
   // Pattern 2 (LEGACY FORMAT): "As a [persona], I want [goal] so that [benefit]"
-  const asAPattern = /[-*]\s*(?:As an?\s+)([^,]+),?\s*I\s+want\s+([^,]+?)(?:,?\s*so\s+that\s+([^.\n]+))?[.\n]/gi;
+  // Uses (.+?) with [.\n] anchor (same fix as Pattern 1 — allows commas in goals)
+  const asAPattern = /[-*]\s*(?:As an?\s+)([^,]+),?\s*I\s+want\s+(.+?)(?:,?\s*so\s+that\s+([^.\n]+))?[.\n]/gi;
 
   while ((match = asAPattern.exec(sectionContent)) !== null) {
     const persona = match[1]?.trim();
@@ -3490,7 +3597,7 @@ export function parseUserStoriesFromEpic(epicContent: string): ParsedUserStory[]
     const title = goal ? `${goal.charAt(0).toUpperCase()}${goal.slice(1)}` : rawText;
 
     stories.push({
-      id: `story-${stories.length + 1}-${Date.now()}`,
+      id: `US-${String(stories.length + 1).padStart(3, '0')}`,
       rawText,
       title: title.length > 100 ? title.slice(0, 97) + '...' : title,
       description: `**User Story**\n\n${rawText}\n\n**Persona:** ${persona || 'User'}\n**Goal:** ${goal || 'N/A'}\n**Benefit:** ${benefit || 'N/A'}`,
@@ -3511,7 +3618,7 @@ export function parseUserStoriesFromEpic(epicContent: string): ParsedUserStory[]
       const text = match[1]?.trim();
       if (text && text.length > 10 && !text.toLowerCase().startsWith('as a')) {
         stories.push({
-          id: `story-${stories.length + 1}-${Date.now()}`,
+          id: `US-${String(stories.length + 1).padStart(3, '0')}`,
           rawText: text,
           title: text.length > 100 ? text.slice(0, 97) + '...' : text,
           description: `**User Story**\n\n${text}`,
@@ -3691,6 +3798,12 @@ Generate a well-formatted issue description:`;
  * Helper: Parse JSON from AI response with cleanup
  */
 function parseJSONResponse<T>(response: string, context: string): T {
+  // Guard against empty/null responses
+  if (!response || response.trim().length === 0) {
+    console.error(`[${context}] Received empty response from AI`);
+    throw new Error(`${context}: AI returned an empty response. This is usually a transient API issue — please try again.`);
+  }
+
   let cleaned = response.trim();
 
   // Remove markdown code fences
@@ -3711,8 +3824,8 @@ function parseJSONResponse<T>(response: string, context: string): T {
     return JSON.parse(cleaned) as T;
   } catch (error) {
     console.error(`[${context}] JSON parse failed:`, error);
-    console.error(`[${context}] Raw response:`, response.substring(0, 500));
-    throw new Error(`Failed to parse ${context} response. Please try again.`);
+    console.error(`[${context}] Raw response (first 500 chars):`, response.substring(0, 500));
+    throw new Error(`${context}: Failed to parse AI response as JSON. The AI may have returned malformed output — please try again.`);
   }
 }
 
@@ -4164,13 +4277,121 @@ Return comprehensive analysis as JSON:`;
     semanticSections?: SemanticSection[];
   }>(response, 'Stage 1 Comprehension');
 
-  return {
+  const baseComprehension: ComprehensionOutput = {
     projectEssence: parsed.projectEssence || 'Project analysis pending',
     keyEntities: parsed.keyEntities || [],
     detectedGaps: parsed.detectedGaps || [],
     implicitRisks: parsed.implicitRisks || [],
     semanticSections: parsed.semanticSections || [],
     timestamp: Date.now()
+  };
+
+  // Refinement Process Step 1 + 2: Requirement Extraction + Gap Analysis
+  try {
+    const reqExtraction = await runRequirementExtraction(epicContent, baseComprehension);
+    return {
+      ...baseComprehension,
+      extractedRequirements: reqExtraction.extractedRequirements || [],
+      requirementCount: reqExtraction.requirementCount || 0,
+      gapAnalysis: reqExtraction.gapAnalysis || [],
+      validOpenQuestions: reqExtraction.validOpenQuestions || [],
+    };
+  } catch (error) {
+    console.warn('[Stage 1] Requirement extraction failed, continuing without:', error);
+    return baseComprehension;
+  }
+}
+
+/**
+ * Refinement Process Steps 1 & 2: Extract every distinct requirement + gap analysis.
+ * Called as second AI call within Stage 1.
+ */
+async function runRequirementExtraction(
+  epicContent: string,
+  comprehension: ComprehensionOutput
+): Promise<{
+  extractedRequirements: ExtractedRequirement[];
+  requirementCount: number;
+  gapAnalysis: RequirementGap[];
+  validOpenQuestions: string[];
+}> {
+  if (!currentConfig) {
+    return { extractedRequirements: [], requirementCount: 0, gapAnalysis: [], validOpenQuestions: [] };
+  }
+
+  const systemPrompt = `You are a requirements engineer performing STEP 1 and STEP 2 of The Refinement Process.
+
+STEP 1: REQUIREMENT EXTRACTION
+Read the entire source document. Extract every distinct requirement as a numbered list.
+
+What counts as a requirement:
+- Any action the source says must happen ("migrate to X", "add support for Y")
+- Any enhancement to existing systems ("enhance pipeline to handle Z")
+- Any infrastructure/operational change ("disable deletion on server X", "establish network path")
+- Any constraint or specification ("use schema file from vendor X", "trigger from Kafka not polling")
+- Any stated decision ("existing flow must remain unchanged")
+- Any integration point ("pull file from system A, write to system B")
+
+Extraction rules:
+- One sentence can contain MULTIPLE requirements if they describe truly independent deliverables.
+  Example: "Enhance the pipeline to support MD5 and parse enclosed fields" is TWO requirements (MD5 support + enclosure parsing).
+- Infrastructure items are FULL requirements. "Set up connectivity between A and B" requires firewall rules, credentials, validation.
+- Preserve every technical specific exactly: algorithms, protocols, formats, trigger mechanisms, system names, field names.
+- Do NOT skip requirements because they seem minor.
+- GRANULARITY GUIDE (CRITICAL): You MUST produce 5-15 requirements. If you have more than 15, you are over-splitting — merge related items. A 400-word document should have 5-8 requirements, not 20+. Group related sub-items: "support OAuth 2.0 with Google and GitHub SSO" is ONE requirement, not three. Each bullet point in a list is NOT automatically a separate requirement — group by theme/capability.
+
+STEP 2: GAP ANALYSIS
+For each extracted requirement, assess:
+- Does the source provide enough detail to implement it?
+- Valid open questions: source genuinely doesn't answer (e.g., "What API does system X expose?")
+- Invalid open questions: source DOES answer this — it's a requirement, not a gap.
+  If the source says "add MD5 support", "Should we support MD5?" is NOT an open question.
+
+OUTPUT FORMAT (JSON only, no markdown fences):
+{
+  "extractedRequirements": [
+    {
+      "reqNum": 1,
+      "description": "<what must be done>",
+      "sourceSection": "<section title where found>",
+      "sourceText": "<exact quote from source, max 200 chars>",
+      "category": "functional|non-functional|infrastructure|operational"
+    }
+  ],
+  "requirementCount": <total count — THIS IS THE CONTRACT>,
+  "gapAnalysis": [
+    {
+      "reqNum": 1,
+      "hasEnoughDetail": true,
+      "openQuestions": ["<legitimate unknowns>"],
+      "detailLevel": "complete|partial|minimal"
+    }
+  ],
+  "validOpenQuestions": ["<questions the source genuinely leaves unanswered>"]
+}`;
+
+  const userPrompt = `PROJECT ESSENCE: ${comprehension.projectEssence}
+
+SOURCE DOCUMENT:
+${epicContent.substring(0, 15000)}
+
+Extract ALL requirements (numbered list) and perform gap analysis. Count them — this count is the contract:`;
+
+  const response = await callAI(currentConfig, systemPrompt, userPrompt);
+  const parsed = parseJSONResponse<{
+    extractedRequirements?: ExtractedRequirement[];
+    requirementCount?: number;
+    gapAnalysis?: RequirementGap[];
+    validOpenQuestions?: string[];
+  }>(response, 'Requirement Extraction');
+
+  console.log(`[Stage 1] Extracted ${parsed.requirementCount || parsed.extractedRequirements?.length || 0} requirements`);
+
+  return {
+    extractedRequirements: parsed.extractedRequirements || [],
+    requirementCount: parsed.requirementCount || parsed.extractedRequirements?.length || 0,
+    gapAnalysis: parsed.gapAnalysis || [],
+    validOpenQuestions: parsed.validOpenQuestions || [],
   };
 }
 
@@ -4617,7 +4838,9 @@ async function refineSingleSectionDynamic(
   transformation: TransformationAction | undefined,
   template: LoadedCategoryTemplate,
   projectName: string,      // Actual project title (e.g., "Mobile Payment System")
-  projectEssence: string    // Project description for context
+  projectEssence: string,   // Project description for context
+  extractedRequirements: ExtractedRequirement[] = [],  // Step 1 requirements for 3A rules
+  sectionFeedback?: string  // Layer 2: feedback from previous iteration
 ): Promise<PipelineRefinedSection> {
   // If score >= 8 on all dimensions, keep as-is
   if (score && score.completeness >= 8 && score.relevance >= 8 && score.placement >= 8) {
@@ -4649,7 +4872,7 @@ async function refineSingleSectionDynamic(
   const action = transformation?.action || 'restructure';
   const formatInstruction = getFormatInstruction(format, columns);
 
-  const systemPrompt = `You are an expert ${template.expertRole}. Refine this section.
+  const systemPrompt = `You are an expert ${template.expertRole}. Refine this section for execution readiness.
 
 SECTION: ${section.title}
 WORD LIMIT: Target ${target} words, maximum ${max} words
@@ -4657,12 +4880,47 @@ TONE: ${template.tone} - ${toneInstruction}
 ${hint ? `GUIDANCE: ${hint}` : ''}
 ${formatInstruction ? `\n${formatInstruction}` : ''}
 
-RULES:
-1. Target ${target} words, never exceed ${max} words - be concise
-2. Be direct - no filler or padding
-3. Only essential information
-4. Start output with ## ${section.title}
-5. Follow the specified format exactly if provided
+QUALITY RULES (non-negotiable):
+1. Target ${target} words, never exceed ${max} words — be concise
+2. NEVER invent information not present in the source content
+3. NEVER expand scope beyond what the user wrote — if the source is thin, keep it thin
+4. PRESERVE specific metrics, dates, numbers, and technical details from the source exactly
+5. NO generic "textbook" content — every sentence must be specific to THIS project
+6. Use correct terminology: SLO = internal reliability target, SLA = external customer commitment, SLI = what we measure
+7. Start output with ## ${section.title}
+8. Follow the specified format exactly if provided
+
+REQUIREMENT PRESERVATION (critical):
+- NEVER drop, remove, or omit any numbered items, bullet points, or specific requirements from the source
+- If the source lists 7 requirements, ALL 7 must appear in the output — none may be silently removed
+- Do NOT declare anything "out of scope" or "non-goal" unless the USER explicitly said it is out of scope
+- Do NOT make design decisions that contradict the user's stated requirements
+- Do NOT merge multiple distinct requirements into one vague paragraph
+- If you cannot fully address a requirement within the word limit, keep it as a brief bullet rather than dropping it
+
+ANTI-PATTERNS TO AVOID:
+- Do NOT add motivational filler ("This is crucial for...", "This approach ensures...", "This setup ensures...", "This will be pivotal...")
+- Do NOT repeat the project name or objective in every paragraph
+- Do NOT add sections/topics the user did not mention (no scope creep)
+- Do NOT convert specific bullet points into vague paragraphs — keep lists as lists
+- Do NOT replace user-specified technologies with generic alternatives (if user says "Kafka trigger", do NOT replace with "scheduled polling")
+- Do NOT use "**Decision**: ... **Tradeoff**: ..." formatting AT ALL — this is a banned pattern. Instead, explain design choices naturally within the prose. If a tradeoff exists, mention it briefly inline (e.g., "While X adds complexity, it provides Y")
+- Do NOT pad each subsection with a "Decision" and "Tradeoff" line — this creates mechanical, template-like output
+- Do NOT write "**Conclusion**" paragraphs that just restate what was already said
+- Do NOT use "leverages", "facilitating", "streamlined", "robust" — use plain language
+${extractedRequirements.length > 0 ? `
+EXTRACTED REQUIREMENTS (THE CONTRACT — all relevant ones must be traceable):
+${extractedRequirements.map(r => `[Req #${r.reqNum}] ${r.description}`).join('\n')}
+
+STEP 3A — CONTENT INTEGRITY (mandatory):
+- No requirement left behind: every Req # relevant to THIS section MUST appear
+- No scope invention: do NOT add "non-goals" or "out of scope" unless the source explicitly states it
+- No decision invention: do NOT change the source's approach (e.g., Kafka→polling, MD5→SHA256)
+- No tech substitution: preserve exact algorithms, protocols, system names, field names
+- Say it once: do NOT repeat the same info that belongs in another section
+- 300-word ceiling: if this section exceeds ~300 words, it is either redundant or too broad
+- Tag requirements inline: when addressing a requirement, include [Req #N] reference
+- Replace [TBD] placeholders: if the source has [TBD], replace with a reasonable estimate or range based on industry standards (e.g., "[TBD] seconds" → "5 seconds" or "within 30 seconds"). NEVER output [TBD], [TODO], or [PLACEHOLDER]` : ''}
 
 Return ONLY the refined section content (no JSON, just markdown).`;
 
@@ -4672,7 +4930,7 @@ PROJECT CONTEXT: ${projectEssence.substring(0, 200)}
 CURRENT CONTENT:
 ${section.content || '(empty)'}
 
-Refine to target ${target} words (max ${max}). Use the exact project name "${projectName}" when referencing the project:`;
+Refine to target ${target} words (max ${max}). EVERY requirement, numbered item, and bullet point from the source MUST appear in the output. Improve clarity and structure but NEVER drop content. When referencing the project, use a short name:${sectionFeedback || ''}`;
 
   try {
     const response = await callAI(currentConfig, systemPrompt, userPrompt);
@@ -4720,7 +4978,9 @@ async function generateMissingSectionDynamic(
   sectionTitle: string,
   comprehension: ComprehensionOutput,
   template: LoadedCategoryTemplate,
-  projectName: string  // Actual project title for AI prompts
+  projectName: string,  // Actual project title for AI prompts
+  extractedRequirements: ExtractedRequirement[] = [],  // Step 1 requirements for 3A rules
+  sectionFeedback?: string  // Layer 2: feedback from previous iteration
 ): Promise<PipelineRefinedSection> {
   if (!currentConfig) {
     return {
@@ -4746,12 +5006,41 @@ TONE: ${template.tone} - ${toneInstruction}
 ${hint ? `GUIDANCE: ${hint}` : ''}
 ${formatInstruction ? `\n${formatInstruction}` : ''}
 
-RULES:
+QUALITY RULES (non-negotiable):
 1. Target ${target} words, never exceed ${max} words
-2. Be specific and actionable
-3. No filler content
-4. Start with ## ${sectionTitle}
-5. Follow the specified format exactly if provided`;
+2. ONLY include content directly relevant to the project's stated scope and entities
+3. Every statement must be specific to THIS project — no generic best-practice filler
+4. Keep it short — if you don't have enough context to write substantively, write less (50-80 words) rather than padding
+5. Start with ## ${sectionTitle}
+6. Follow the specified format exactly if provided
+
+CRITICAL RESTRICTIONS:
+- Do NOT declare anything as "out of scope" or "non-goal" unless the user explicitly said it is out of scope
+- Do NOT make design decisions that contradict the user's requirements (e.g., if user says "Kafka trigger", don't replace with "polling")
+- Do NOT add technologies, services, or components the user did not mention (no "Web App", "Mobile App", "Stripe" if the user's project is a data pipeline)
+- Do NOT invent specific numbers, dates, or metrics not inferable from the project context
+- Derive ALL content from the project context provided — if the context doesn't mention a topic, write a brief placeholder (50 words max) rather than inventing content
+
+ANTI-PATTERNS TO AVOID:
+- Do NOT write generic paragraphs about industry best practices
+- Do NOT repeat the project objective in every section
+- Do NOT add motivational filler ("This is crucial...", "This ensures...", "This setup ensures...", "This will be pivotal...")
+- Do NOT use "**Decision**: ... **Tradeoff**: ..." formatting AT ALL — this is a banned pattern. Explain design choices naturally within the prose
+- Do NOT pad each subsection with a "Decision" and "Tradeoff" line — this creates mechanical, template-like output
+- Do NOT write "**Conclusion**" paragraphs that just restate what was already said
+- Do NOT use "leverages", "facilitating", "streamlined", "robust" — use plain language
+- Be CONCISE — if the context only has 50 words of relevant information, write 50 words not 200
+${extractedRequirements.length > 0 ? `
+EXTRACTED REQUIREMENTS (THE CONTRACT):
+${extractedRequirements.map(r => `[Req #${r.reqNum}] ${r.description}`).join('\n')}
+
+STEP 3A — CONTENT INTEGRITY:
+- Only address requirements relevant to "${sectionTitle}" — do NOT try to cover all requirements
+- No scope invention: do NOT add "non-goals" unless the source explicitly states them
+- No decision invention: preserve the source's stated approach
+- No tech substitution: preserve exact algorithms, protocols, system names
+- Tag requirements inline with [Req #N] when addressing them
+- NEVER output [TBD], [TODO], or [PLACEHOLDER] — use concrete estimates or omit` : ''}`;
 
   const userPrompt = `PROJECT NAME: ${projectName}
 PROJECT CONTEXT: ${comprehension.projectEssence.substring(0, 200)}
@@ -4759,7 +5048,7 @@ PROJECT CONTEXT: ${comprehension.projectEssence.substring(0, 200)}
 KEY INFO:
 ${comprehension.keyEntities.slice(0, 5).map(e => `- ${e.entity}: ${e.description}`).join('\n')}
 
-Generate the section (target ${target} words, max ${max}). Use the exact project name "${projectName}" when referencing the project:`;
+Generate the section (target ${target} words, max ${max}). Stay within the project's stated scope. Do NOT add topics the user did not mention. If you lack context, keep it brief rather than adding filler:${sectionFeedback || ''}`;
 
   try {
     const response = await callAI(currentConfig, systemPrompt, userPrompt);
@@ -4809,7 +5098,8 @@ export async function runStage4Refinement(
   classification: ClassificationOutput,
   structural: StructuralOutput,
   projectName: string,  // Original epic title - used in prompts for consistency
-  onProgress?: (current: number, total: number, section: string) => void
+  onProgress?: (current: number, total: number, section: string) => void,
+  iterationFeedback?: IterationFeedback  // Layer 2: feedback from previous iteration
 ): Promise<RefinementOutput> {
   // Load template with word limits
   const template = loadCategoryTemplate(classification.primaryCategory);
@@ -4842,6 +5132,11 @@ export async function runStage4Refinement(
       t.sectionTitle.toLowerCase() === section.title.toLowerCase()
     );
 
+    // Layer 2: Build section-specific feedback if available
+    const sectionFeedbackStr = iterationFeedback
+      ? formatSectionFeedback(section.title, iterationFeedback.stage4Feedback, iterationFeedback.positiveAnchors)
+      : undefined;
+
     // Use throttler to limit concurrent API calls
     // Pass projectName (actual title) for AI prompts, not projectEssence (description)
     const result = await apiThrottler.throttle(() =>
@@ -4851,7 +5146,9 @@ export async function runStage4Refinement(
         transformation,
         template,
         projectName,
-        comprehension.projectEssence
+        comprehension.projectEssence,
+        comprehension.extractedRequirements || [],
+        sectionFeedbackStr
       )
     );
 
@@ -4870,11 +5167,24 @@ export async function runStage4Refinement(
   }
 
   // Generate missing required sections with throttling
-  for (const missingSectionTitle of structural.missingSections) {
+  // QUALITY SAFEGUARD: Cap auto-generated sections to prevent scope creep
+  // If the user wrote 7 sections, don't auto-generate 10 more generic ones
+  const MAX_AUTO_GENERATED = 5;
+  const missingSectionsToGenerate = structural.missingSections.slice(0, MAX_AUTO_GENERATED);
+  if (structural.missingSections.length > MAX_AUTO_GENERATED) {
+    console.log(`[Stage 4] Capping auto-generated sections: ${structural.missingSections.length} missing → generating top ${MAX_AUTO_GENERATED}`);
+  }
+
+  for (const missingSectionTitle of missingSectionsToGenerate) {
     processed++;
     if (onProgress) {
       onProgress(processed, total, `Adding: ${missingSectionTitle}`);
     }
+
+    // Layer 2: Build section-specific feedback for missing sections too
+    const missingFeedbackStr = iterationFeedback
+      ? formatSectionFeedback(missingSectionTitle, iterationFeedback.stage4Feedback, iterationFeedback.positiveAnchors)
+      : undefined;
 
     // Use throttler to limit concurrent API calls
     // Pass projectName for consistent naming in generated content
@@ -4883,7 +5193,9 @@ export async function runStage4Refinement(
         missingSectionTitle,
         comprehension,
         template,
-        projectName
+        projectName,
+        comprehension.extractedRequirements || [],
+        missingFeedbackStr
       )
     );
     refinedSections.push(generated);
@@ -4990,7 +5302,9 @@ async function runStage5AArchitecture(
  */
 async function runStage5BUserStories(
   refinement: RefinementOutput,
-  classification: ClassificationOutput
+  classification: ClassificationOutput,
+  extractedRequirements: ExtractedRequirement[] = [],
+  storyFeedback?: string  // Layer 2: feedback from previous iteration
 ): Promise<{ stories: PipelineUserStory[]; coverage: CoverageReport }> {
   if (!currentConfig) {
     return {
@@ -5006,29 +5320,72 @@ async function runStage5BUserStories(
   const storyStyle = STORY_STYLE_PROMPTS[classification.categoryConfig.storyStyle] ||
     'As a [user]';
 
-  // Combine all refined content
+  // Combine BOTH original and refined content — original content is critical because
+  // Stage 4 may have dropped or rephrased specific requirements. By including both,
+  // the AI sees ALL user requirements even if Stage 4 missed some.
   const allContent = refinement.refinedSections
-    .map(s => s.refinedContent)
+    .map(s => {
+      const original = s.originalContent?.trim();
+      const refined = s.refinedContent?.trim();
+      // If original has substantially different content, include both
+      if (original && refined && original.length > 50 && Math.abs(original.length - refined.length) > 100) {
+        return `--- ORIGINAL USER CONTENT ---\n${original}\n\n--- REFINED CONTENT ---\n${refined}`;
+      }
+      return refined || original || '';
+    })
     .join('\n\n');
 
-  const systemPrompt = `You are an expert Agile coach extracting user stories from technical documentation.
+  const systemPrompt = `You are an expert Agile coach creating a sprint-ready backlog from technical documentation.
 
 STORY STYLE: ${storyStyle}
 
+IMPORTANT — EXISTING STORIES:
+If the content already contains user stories (US-XXX format with "As a [user], I want..." pattern):
+- Do NOT include existing stories in your output — they are already handled separately
+- Start numbering NEW stories AFTER the last existing story ID (e.g., if US-005 exists, start new stories at US-006)
+- Do NOT regenerate, rephrase, or create new stories that cover the SAME topic as an existing story
+- If an existing story covers "PostgreSQL upgrade", do NOT create another story about PostgreSQL upgrade
+- Only create stories for requirements that are NOT already covered by existing stories
+
+STORY SIZING (non-negotiable):
+- Each story must be a SMALL SHIPPABLE SLICE — completable by one developer
+- Use Fibonacci estimation: 1, 2, 3, or 5 story points (1 point = 1 developer-day)
+- MAXIMUM story size: 5 points. If a requirement is larger, BREAK IT DOWN into multiple stories
+- Total backlog should not exceed 30 story points
+- "Implement microservices" is NOT a story — "Containerize the Auth Service with health checks" IS a story
+
 YOUR TASK:
-1. Extract ALL user needs from the refined content
-2. Create a professional, action-oriented TITLE for each story (5-8 words max)
-3. Format the story as: "As a [persona], I want [goal], so that [benefit]"
-4. Add 2-3 acceptance criteria per story
-5. Assign priority (high/medium/low)
-6. Note which section the story derives from
+1. Read ALL content carefully — including the "ORIGINAL USER CONTENT" sections which contain the user's actual requirements
+2. Identify EVERY numbered requirement, bullet point, and specific ask from the user
+3. Create stories that cover EVERY requirement — if the user listed 7 things to do, there must be at least 7 stories (possibly more if items need to be broken down)
+4. Do NOT skip requirements. Do NOT declare anything out of scope. Every item the user mentioned must have a corresponding story
+5. Each story must be independently deployable and testable
+6. Create a professional, action-oriented TITLE for each story (5-8 words max)
+7. Format: "As a [specific persona], I want to [verb phrase], so that [measurable benefit]" — ALWAYS use "I want to [verb]", never "I want [verb]"
+8. Add 2-4 MEASURABLE acceptance criteria per story (not vague — include numbers, thresholds, or verifiable conditions)
+9. Assign priority (high/medium/low) and story points (1/2/3/5)
+10. Note which section/requirement the story derives from
 
 TITLE GUIDELINES:
-- Start with action verb: Implement, Add, Create, Enable, Configure, Integrate
+- Start with action verb: Implement, Add, Create, Enable, Configure, Deploy, Migrate, Set up
 - Be crisp and scannable (5-8 words maximum)
-- Use technical terms appropriately (MFA, API, OAuth, SSO)
-- Avoid verbose phrases like "the ability to" or "functionality for"
-- Examples: "Implement MFA Authentication", "Add Transaction History Export", "Configure Role-Based Access"
+- Use technical terms appropriately
+- Examples: "Deploy PgBouncer Connection Pooling", "Set up K8s CI/CD Pipeline", "Configure Istio mTLS"
+
+QUALITY CHECKS:
+- If a story is vague (e.g., "improve performance"), make it specific (e.g., "reduce p99 query latency to <100ms")
+- Acceptance criteria must be binary (pass/fail) — not subjective. Banned phrases: "works as expected", "system performs correctly", "handles gracefully"
+- Each story should specify what "done" looks like: tested, deployed, monitored
+- No template stutter: verify no story contains "I want to I want to" or "so that so that"
+${extractedRequirements.length > 0 ? `
+REQUIREMENTS CONTRACT (from Step 1 — ${extractedRequirements.length} total):
+${extractedRequirements.map(r => `[Req #${r.reqNum}] ${r.description}`).join('\n')}
+
+STEP 3C — USER STORY RULES (mandatory):
+- FULL COVERAGE: Every Req # above must map to at least one story. Tag each story with "reqTags" array.
+- No orphan stories: every story must trace back to at least one Req #
+- Match source framing: if source says "event-driven trigger", stories must say that — NOT polling
+- If a requirement is too large for one story (>5 points), break it into multiple stories that share the same reqTags` : ''}
 
 OUTPUT FORMAT:
 Return ONLY valid JSON:
@@ -5036,23 +5393,34 @@ Return ONLY valid JSON:
   "stories": [
     {
       "id": "US-001",
-      "title": "<professional action-oriented title, 5-8 words>",
-      "persona": "<specific role>",
-      "goal": "<what they want>",
-      "benefit": "<why they want it>",
-      "acceptanceCriteria": ["<AC1>", "<AC2>"],
+      "title": "<action-oriented title, 5-8 words>",
+      "persona": "<specific role: platform engineer, backend engineer, etc.>",
+      "goal": "<concrete deliverable>",
+      "benefit": "<measurable benefit>",
+      "acceptanceCriteria": ["<measurable AC1>", "<measurable AC2>", "<measurable AC3>"],
       "priority": "high|medium|low",
-      "sourceSection": "<section title>"
+      "storyPoints": 1|2|3|5,
+      "sourceSection": "<section title>",
+      "reqTags": [1, 2]
     }
   ],
-  "totalRequirements": <number of requirements identified>,
-  "uncoveredRequirements": ["<requirement not covered by stories>"]
+  "totalRequirements": <number>,
+  "uncoveredRequirements": ["<requirement not covered>"]
 }`;
+
+  // Detect existing stories to tell AI what's already covered
+  const existingStoryMatches = allContent.match(/US-\d+[:\s].+/g) || [];
+  const existingStoryList = existingStoryMatches.length > 0
+    ? `\n\nALREADY COVERED (do NOT create stories for these topics):\n${existingStoryMatches.map(s => `- ${s.substring(0, 100)}`).join('\n')}`
+    : '';
+
+  const lastStoryNum = existingStoryMatches.length;
 
   const userPrompt = `EPIC CONTENT:
 ${allContent.substring(0, 12000)}
+${existingStoryList}
 
-Extract comprehensive user stories:`;
+Create ONLY NEW stories (start at US-${String(lastStoryNum + 1).padStart(3, '0')}) for requirements NOT already covered above. Max 5 points each, total ~30 points. Break large requirements into multiple smaller stories:${storyFeedback || ''}`;
 
   try {
     const response = await callAI(currentConfig, systemPrompt, userPrompt);
@@ -5085,6 +5453,173 @@ Extract comprehensive user stories:`;
 }
 
 /**
+ * Parse existing user stories from any markdown format.
+ * Handles plain text, bold, blockquote, and checkbox formats.
+ * Returns PipelineUserStory[] for consistent merging with Stage 5B output.
+ */
+function parseExistingStories(content: string): PipelineUserStory[] {
+  const stories: PipelineUserStory[] = [];
+  const lines = content.split('\n');
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+
+    // Match any line containing US-XXX: pattern (bold, plain, or bullet)
+    const storyMatch = line.match(/\*{0,2}(US-\d+)[:\s*]+(.+?)(?:\*{0,2}\s*[🔴🟠🟡🟢]*\s*)$/);
+    if (!storyMatch) {
+      i++;
+      continue;
+    }
+
+    const id = storyMatch[1];
+    let storyText = storyMatch[2].trim();
+    // Remove trailing bold markers and emojis
+    storyText = storyText.replace(/\*{1,2}$/, '').trim();
+
+    // Parse "As a [persona], I want [goal] so that [benefit]" from this line or next lines
+    let persona = 'user';
+    let goal = storyText;
+    let benefit = 'achieve the desired outcome';
+    let title = '';
+
+    // Check if this line or the next line has the "As a..." pattern
+    const fullBlock = lines.slice(i, Math.min(i + 5, lines.length)).join(' ');
+    const asAMatch = fullBlock.match(/As an?\s+(.+?),\s*I want\s+(.+?)\s+so that\s+(.+?)(?:\.|$)/i);
+    if (asAMatch) {
+      persona = asAMatch[1].trim();
+      goal = asAMatch[2].trim();
+      benefit = asAMatch[3].trim().replace(/\.$/, '');
+    }
+
+    // If the story line has a title before "As a...", extract it
+    const titleMatch = storyText.match(/^(.+?)(?:\s*[-–—]\s*)?As an?\s/i);
+    if (titleMatch) {
+      title = titleMatch[1].trim();
+    }
+    if (!title) {
+      // Generate a concise action-oriented title from the goal
+      // Capitalize first letter and take first 6-8 meaningful words
+      const words = goal.split(/\s+/);
+      const titleWords = words.slice(0, 7);
+      // Capitalize first word if it starts lowercase
+      if (titleWords.length > 0) {
+        titleWords[0] = titleWords[0].charAt(0).toUpperCase() + titleWords[0].slice(1);
+      }
+      title = titleWords.join(' ');
+      // Remove trailing prepositions/conjunctions for clean titles
+      title = title.replace(/\s+(by|and|or|to|for|with|in|on|at|the|a|an|so|that)$/i, '');
+    }
+
+    i++;
+
+    // Collect acceptance criteria (look ahead for AC lines)
+    const acceptanceCriteria: string[] = [];
+    while (i < lines.length) {
+      const acLine = lines[i].trim();
+      // Stop at next story, section header, or empty line after ACs
+      if (acLine.match(/^\*{0,2}US-\d+/)) break;
+      if (acLine.match(/^#{1,3}\s/)) break;
+      if (acLine === '' && acceptanceCriteria.length > 0) {
+        // Check if next non-empty line is a new story or section
+        const nextNonEmpty = lines.slice(i + 1).find(l => l.trim() !== '');
+        if (!nextNonEmpty || nextNonEmpty.trim().match(/^(\*{0,2}US-\d+|#{1,3}\s)/)) break;
+      }
+
+      if (acLine.startsWith('Acceptance Criteria')) {
+        // Header line — check if criteria are inline (after colon)
+        const inlineAC = acLine.replace(/^Acceptance Criteria:?\s*/i, '').trim();
+        if (inlineAC) {
+          // Split inline ACs by comma or semicolon
+          inlineAC.split(/[,;]/).forEach(ac => {
+            const trimmed = ac.trim();
+            if (trimmed) acceptanceCriteria.push(trimmed);
+          });
+        }
+        i++;
+        continue;
+      }
+
+      // Checkbox format: - [ ] AC text
+      const checkboxMatch = acLine.match(/^[-*]\s*\[[ x]\]\s*(.+)/i);
+      if (checkboxMatch) {
+        acceptanceCriteria.push(checkboxMatch[1].trim());
+        i++;
+        continue;
+      }
+
+      // Bullet format: - AC text (only if we've seen "Acceptance Criteria" header or already have ACs)
+      const bulletMatch = acLine.match(/^[-*]\s+(.+)/);
+      if (bulletMatch && acceptanceCriteria.length >= 0 && acLine !== '' &&
+          !bulletMatch[1].match(/^(As an?\s|US-\d+)/i)) {
+        // Only treat as AC if it doesn't look like a story or section header
+        if (lines.slice(Math.max(0, i - 3), i).some(l => l.trim().match(/Acceptance Criteria|US-\d+/i))) {
+          acceptanceCriteria.push(bulletMatch[1].trim());
+        }
+      }
+
+      i++;
+    }
+
+    stories.push({
+      id,
+      title,
+      persona,
+      goal,
+      benefit,
+      acceptanceCriteria,
+      priority: 'medium', // Default — no priority in plain format
+      sourceSection: 'User Input',
+    });
+  }
+
+  return stories;
+}
+
+/**
+ * Check if two user stories are similar enough to be considered duplicates.
+ * Uses word overlap on the goal text (60%+ overlap = duplicate).
+ */
+function areStoriesSimilar(a: PipelineUserStory, b: PipelineUserStory): boolean {
+  const stopWords = new Set(['want', 'that', 'with', 'from', 'this', 'will', 'have', 'been', 'their', 'using', 'into', 'than', 'them', 'each', 'which', 'about', 'when', 'make', 'like', 'should', 'could', 'would']);
+
+  function getKeyWords(text: string): Set<string> {
+    return new Set(
+      text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/)
+        .filter(w => w.length > 3 && !stopWords.has(w))
+    );
+  }
+
+  function wordOverlap(setA: Set<string>, setB: Set<string>): number {
+    if (setA.size === 0 || setB.size === 0) return 0;
+    const overlap = [...setA].filter(w => setB.has(w)).length;
+    return overlap / Math.min(setA.size, setB.size);
+  }
+
+  // Check goal similarity
+  const goalSim = wordOverlap(getKeyWords(a.goal), getKeyWords(b.goal));
+  if (goalSim >= 0.5) return true;
+
+  // Check title similarity (titles often share key nouns even when goals are rephrased)
+  if (a.title && b.title) {
+    const titleSim = wordOverlap(getKeyWords(a.title), getKeyWords(b.title));
+    if (titleSim >= 0.5) return true;
+  }
+
+  // Cross-check: title of one vs goal of other (AI often puts goal keywords in title)
+  if (a.title) {
+    const crossSim = wordOverlap(getKeyWords(a.title), getKeyWords(b.goal));
+    if (crossSim >= 0.5) return true;
+  }
+  if (b.title) {
+    const crossSim = wordOverlap(getKeyWords(a.goal), getKeyWords(b.title));
+    if (crossSim >= 0.5) return true;
+  }
+
+  return false;
+}
+
+/**
  * SKILL: Assemble epic with embedded diagram and user stories
  * Embeds content INTO the epic markdown
  */
@@ -5097,48 +5632,53 @@ function assembleEpicWithEmbedding(
   // Load template for format hints (used for priority emoji in stories)
   const defaults = getGlobalDefaults();
 
+  // Common action verbs for goal grammar normalization ("I want to [verb]")
+  const ACTION_VERBS = new Set(['implement', 'deploy', 'create', 'configure', 'enable', 'set', 'build', 'add', 'integrate', 'migrate', 'upgrade', 'install', 'develop', 'design', 'establish', 'monitor', 'optimize', 'automate', 'ensure', 'track', 'containerize', 'introduce', 'define', 'provision', 'refactor', 'validate', 'parse', 'retain', 'move', 'apply', 'connect', 'trigger', 'enforce', 'disable', 'modify', 'transfer', 'enhance', 'support', 'maintain', 'generate', 'process', 'handle', 'manage', 'update', 'remove', 'send', 'receive', 'store', 'retrieve', 'transform', 'convert', 'verify', 'test', 'secure', 'expose', 'consume', 'publish', 'subscribe', 'schedule', 'execute', 'run', 'start', 'stop', 'restart', 'initialize', 'setup', 'teardown', 'clean', 'purge', 'archive', 'backup', 'restore', 'sync', 'replicate', 'partition', 'aggregate', 'filter', 'sort', 'index', 'cache', 'load', 'ingest', 'extract', 'emit', 'route', 'forward', 'redirect', 'map', 'reduce', 'merge', 'split', 'join', 'link', 'unlink', 'register', 'deregister', 'authenticate', 'authorize', 'encrypt', 'decrypt', 'compress', 'decompress', 'normalize', 'sanitize', 'throttle', 'limit', 'retry', 'poll', 'push', 'pull', 'fetch', 'post', 'patch', 'delete', 'list', 'query', 'search', 'scan', 'inspect', 'audit', 'log', 'notify', 'alert', 'report', 'measure', 'benchmark', 'profile', 'instrument', 'annotate', 'tag', 'label', 'classify', 'categorize', 'prioritize', 'allocate', 'assign', 'delegate', 'orchestrate', 'coordinate', 'mediate', 'negotiate', 'resolve', 'diagnose', 'troubleshoot', 'remediate', 'mitigate', 'prevent', 'protect', 'isolate', 'contain', 'quarantine', 'rollback', 'revert', 'undo', 'redo', 'replay', 'simulate', 'mock', 'stub', 'wrap', 'extend', 'override', 'intercept', 'inject', 'embed', 'attach', 'detach', 'bind', 'unbind', 'listen', 'watch', 'observe', 'detect', 'discover', 'enumerate', 'iterate', 'traverse', 'navigate', 'render', 'display', 'show', 'hide', 'toggle', 'expand', 'collapse', 'select', 'deselect', 'check', 'uncheck', 'submit', 'cancel', 'confirm', 'reject', 'approve', 'deny', 'grant', 'revoke', 'elevate', 'demote', 'promote', 'deprecate', 'sunset', 'decommission', 'onboard', 'offboard']);
+
+  /** Normalize story goal/benefit grammar — ensure "I want to [verb]" */
+  function normalizeGoal(goal: string): string {
+    if (goal.toLowerCase().startsWith('to ')) return goal;
+    const firstWord = goal.split(/\s+/)[0].toLowerCase();
+    // Known action verb → prepend "to"
+    if (ACTION_VERBS.has(firstWord)) {
+      return 'to ' + goal.charAt(0).toLowerCase() + goal.slice(1);
+    }
+    // Heuristic: if first word looks like a verb (lowercase or Capitalized) followed by
+    // an object (noun/article), it's likely a verb phrase the AI returned.
+    // Pattern: "[verb] [noun/object]..." where the goal doesn't start with articles/prepositions/pronouns
+    const nonVerbStarters = new Set(['the', 'a', 'an', 'my', 'our', 'this', 'that', 'these', 'those', 'all', 'each', 'every', 'some', 'any', 'no', 'not', 'when', 'if', 'for', 'with', 'by', 'from', 'in', 'on', 'at', 'of', 'about', 'between', 'through', 'during', 'before', 'after', 'above', 'below', 'under', 'over']);
+    if (!nonVerbStarters.has(firstWord) && goal.split(/\s+/).length >= 2) {
+      return 'to ' + goal.charAt(0).toLowerCase() + goal.slice(1);
+    }
+    return goal;
+  }
+  function normalizeBenefit(benefit: string): string {
+    if (benefit && /^[A-Z]/.test(benefit) && !benefit.match(/^(I |We |The |A |An |Our |My |It |This |That )/)) {
+      return benefit.charAt(0).toLowerCase() + benefit.slice(1);
+    }
+    return benefit;
+  }
+
+  // Sanitize project name for H1 title — prevent sentence-as-title and truncation
+  const title = sanitizeProjectName(projectName);
+
   // Start with title and GitLab TOC
-  let epic = `# ${projectName}\n\n`;
+  let epic = `# ${title}\n\n`;
   epic += `[[_TOC_]]\n\n`; // GitLab Table of Contents
 
-  // Separate priority sections (Epic Status) from regular sections
-  // Note: TL;DR is now merged into Objective per template v2.1.0
-  const prioritySections: typeof refinement.refinedSections = [];
-  const regularSections: typeof refinement.refinedSections = [];
-
-  for (const section of refinement.refinedSections) {
-    const titleLower = section.sectionTitle.toLowerCase();
-    // Epic Status (formerly Metadata Header) goes first
-    if (titleLower === 'epic status' || titleLower === 'metadata header') {
-      prioritySections.push(section);
-    } else {
-      regularSections.push(section);
-    }
-  }
-
-  // Add priority sections first
-  for (const section of prioritySections) {
-    let content = section.refinedContent.trim();
-    if (!content.startsWith('##')) {
-      content = `## ${section.sectionTitle}\n\n${content}`;
-    }
-    epic += content + '\n\n';
-  }
-
-  // Add separator after priority sections if any were added
-  if (prioritySections.length > 0) {
-    epic += `*Generated on ${new Date().toLocaleDateString()}*\n\n---\n\n`;
-  } else {
-    epic += `*Generated on ${new Date().toLocaleDateString()}*\n\n---\n\n`;
-  }
+  // Add "Generated on" date after TOC (single instance, before all sections)
+  epic += `*Generated on ${new Date().toLocaleDateString()}*\n\n---\n\n`;
 
   // Track if we've already embedded diagram/stories (only embed once)
   let diagramEmbedded = false;
   let storiesEmbedded = false;
 
-  // Add all regular sections in their original order
-  for (const section of regularSections) {
+  // Add all sections in their original order
+  // Epic Status appears in natural position (not forced to top), so readers get context first
+  for (const section of refinement.refinedSections) {
     let content = section.refinedContent.trim();
+    // Bug #2 fix: Remove any existing "Generated on" date lines from refined content
+    content = content.replace(/\*Generated on .+?\*\s*\n?/g, '').trim();
 
     // Section might already be wrapped in <details> from refinement
     const isAlreadyCollapsible = content.startsWith('<details>');
@@ -5159,14 +5699,54 @@ function assembleEpicWithEmbedding(
     const isStorySection = section.sectionTitle.toLowerCase().includes('feature') ||
                            section.sectionTitle.toLowerCase().includes('user stor');
     if (isStorySection && stories.length > 0 && !storiesEmbedded) {
+      // 1. Parse existing user stories from the ORIGINAL content (before Stage 4 AI rewrite)
+      //    Stage 4 may destroy "As a..., I want..., so that..." format, so we parse from original
+      const existingStories = parseExistingStories(section.originalContent || content);
+
+      // 2. Strip ALL user story content — keep only preamble (features, intro text)
+      //    Find first US-XXX pattern and cut everything from there
+      const firstStoryIdx = content.search(/(?:^|\n)\s*(?:\*{0,2})US-\d+/m);
+      if (firstStoryIdx > 0) {
+        content = content.substring(0, firstStoryIdx).trim();
+      } else {
+        // Also strip "### User Stories" subsection headers and everything after
+        const storyHeaderIdx = content.search(/\n*###?\s*User Stories/i);
+        if (storyHeaderIdx >= 0) {
+          content = content.substring(0, storyHeaderIdx).trim();
+        }
+      }
+      // Clean up any trailing "As a..." or "Acceptance Criteria:" orphan lines
+      content = content.replace(/\n\s*As an?\s+.+,\s*I want\s+.+$/gim, '').trim();
+      content = content.replace(/\n\s*Acceptance Criteria.*$/gim, '').trim();
+
+      // 3. Merge existing stories + AI-generated stories (dedup by goal similarity)
+      const merged: PipelineUserStory[] = [...existingStories];
+      for (const newStory of stories) {
+        const isDuplicate = merged.some(existing => areStoriesSimilar(existing, newStory));
+        if (!isDuplicate) {
+          merged.push(newStory);
+        }
+      }
+
+      // 4. Re-number all stories sequentially and format consistently
       const priorityEmoji = defaults.priorityLevels;
-      content += '\n\n### User Stories\n\n';
-      for (const story of stories) {
+      // Only add "### User Stories" sub-header if this is a Features section (not if already a User Stories section)
+      const isFeaturesSection = section.sectionTitle.toLowerCase().includes('feature');
+      content += isFeaturesSection ? '\n\n### User Stories\n\n' : '\n\n';
+      merged.forEach((story, idx) => {
+        const newId = `US-${String(idx + 1).padStart(3, '0')}`;
         const emoji = priorityEmoji[story.priority] || '';
-        // Use title if available, fallback to goal for backward compatibility
         const storyTitle = story.title || story.goal;
-        content += `**${story.id}: ${storyTitle}** ${emoji}\n`;
-        content += `> As a ${story.persona}, I want ${story.goal}, so that ${story.benefit}.\n\n`;
+        const pointsLabel = story.storyPoints ? ` [${story.storyPoints}pt]` : '';
+        const reqTagStr = story.reqTags?.length
+          ? ` [${story.reqTags.map(n => `Req #${n}`).join(', ')}]`
+          : '';
+        content += `**${newId}: ${storyTitle}**${pointsLabel}${reqTagStr} ${emoji}\n`;
+
+        const goal = normalizeGoal(story.goal);
+        const benefit = normalizeBenefit(story.benefit);
+
+        content += `> As a ${story.persona}, I want ${goal}, so that ${benefit}.\n\n`;
         if (story.acceptanceCriteria && story.acceptanceCriteria.length > 0) {
           content += 'Acceptance Criteria:\n';
           story.acceptanceCriteria.forEach(ac => {
@@ -5174,7 +5754,7 @@ function assembleEpicWithEmbedding(
           });
           content += '\n';
         }
-      }
+      });
       storiesEmbedded = true;
     }
 
@@ -5190,11 +5770,26 @@ function assembleEpicWithEmbedding(
   if (!storiesEmbedded && stories.length > 0) {
     const priorityEmoji = defaults.priorityLevels;
     epic += '## User Stories\n\n';
-    for (const story of stories) {
+    stories.forEach((story, idx) => {
+      const newId = `US-${String(idx + 1).padStart(3, '0')}`;
       const emoji = priorityEmoji[story.priority] || '';
-      epic += `**${story.id}** ${emoji} ${story.priority.toUpperCase()}\n`;
-      epic += `As a ${story.persona}, I want ${story.goal}, so that ${story.benefit}.\n\n`;
-    }
+      const storyTitle = story.title || story.goal;
+      const pointsLabel = story.storyPoints ? ` [${story.storyPoints}pt]` : '';
+      const reqTagStr = story.reqTags?.length
+        ? ` [${story.reqTags.map(n => `Req #${n}`).join(', ')}]`
+        : '';
+      epic += `**${newId}: ${storyTitle}**${pointsLabel}${reqTagStr} ${emoji}\n`;
+      const goal = normalizeGoal(story.goal);
+      const benefit = normalizeBenefit(story.benefit);
+      epic += `> As a ${story.persona}, I want ${goal}, so that ${benefit}.\n\n`;
+      if (story.acceptanceCriteria && story.acceptanceCriteria.length > 0) {
+        epic += 'Acceptance Criteria:\n';
+        story.acceptanceCriteria.forEach(ac => {
+          epic += `- [ ] ${ac}\n`;
+        });
+        epic += '\n';
+      }
+    });
   }
 
   const markdown = epic.trim();
@@ -5207,6 +5802,94 @@ function assembleEpicWithEmbedding(
   };
 }
 
+// Valid Fibonacci story point values
+const VALID_STORY_POINTS = [1, 2, 3, 5] as const;
+const MAX_STORY_POINTS = 5;
+const TOTAL_STORY_POINTS_CAP = 30;
+
+/**
+ * Snap a number to the largest valid Fibonacci value that doesn't exceed it.
+ * Floor of 1 for any positive value.
+ */
+function snapToFibonacci(value: number): number {
+  if (value <= 0) return 1;
+  if (value >= MAX_STORY_POINTS) return MAX_STORY_POINTS;
+  // Find largest valid value <= input
+  for (let i = VALID_STORY_POINTS.length - 1; i >= 0; i--) {
+    if (VALID_STORY_POINTS[i] <= value) return VALID_STORY_POINTS[i];
+  }
+  return 1;
+}
+
+/**
+ * Post-Stage 5B deterministic validation and auto-correction of story points.
+ * Enforces: valid Fibonacci values {1,2,3,5}, max 5 per story, total cap ~30.
+ * Returns corrections log for audit/gap report.
+ */
+export function validateAndCorrectStoryPoints(
+  stories: PipelineUserStory[]
+): StoryPointCorrection[] {
+  const corrections: StoryPointCorrection[] = [];
+
+  // Step 1 & 2: Clamp each story to valid Fibonacci, enforce per-story cap
+  for (const story of stories) {
+    if (story.storyPoints === undefined || story.storyPoints === null) continue;
+    const original = story.storyPoints;
+    if (!VALID_STORY_POINTS.includes(original as typeof VALID_STORY_POINTS[number])) {
+      const corrected = snapToFibonacci(original);
+      corrections.push({
+        storyId: story.id,
+        original,
+        corrected,
+        reason: original > MAX_STORY_POINTS ? 'exceeds_per_story_cap' : 'invalid_fibonacci'
+      });
+      story.storyPoints = corrected;
+    }
+  }
+
+  // Step 3: Enforce total cap — reduce largest stories first
+  let total = stories.reduce((sum, s) => sum + (s.storyPoints || 0), 0);
+  if (total > TOTAL_STORY_POINTS_CAP) {
+    // Sort indices by points descending (stable sort by original order for ties)
+    const sortedIndices = stories
+      .map((s, i) => ({ idx: i, pts: s.storyPoints || 0 }))
+      .filter(x => x.pts > 1)
+      .sort((a, b) => b.pts - a.pts);
+
+    for (const { idx } of sortedIndices) {
+      if (total <= TOTAL_STORY_POINTS_CAP) break;
+      const story = stories[idx];
+      const original = story.storyPoints || 0;
+      // Reduce to next lower Fibonacci
+      const fibIdx = VALID_STORY_POINTS.indexOf(original as typeof VALID_STORY_POINTS[number]);
+      if (fibIdx > 0) {
+        const corrected = VALID_STORY_POINTS[fibIdx - 1];
+        const alreadyCorrected = corrections.find(c => c.storyId === story.id);
+        if (alreadyCorrected) {
+          // Update existing correction
+          alreadyCorrected.corrected = corrected;
+          alreadyCorrected.reason = 'total_cap_reduction';
+        } else {
+          corrections.push({
+            storyId: story.id,
+            original,
+            corrected,
+            reason: 'total_cap_reduction'
+          });
+        }
+        total -= (original - corrected);
+        story.storyPoints = corrected;
+      }
+    }
+  }
+
+  if (corrections.length > 0) {
+    console.log(`[Stage 5B] Story point corrections: ${corrections.length} stories adjusted (total: ${total}/${TOTAL_STORY_POINTS_CAP})`);
+  }
+
+  return corrections;
+}
+
 /**
  * Stage 5: Generate blueprint, user stories, and assemble with embedding
  */
@@ -5214,7 +5897,8 @@ export async function runStage5Mandatory(
   refinement: RefinementOutput,
   comprehension: ComprehensionOutput,
   classification: ClassificationOutput,
-  originalProjectTitle?: string
+  originalProjectTitle?: string,
+  iterationFeedback?: IterationFeedback  // Layer 2: feedback from previous iteration
 ): Promise<MandatoryOutput> {
   // Use original title if provided, otherwise extract from comprehension (fallback)
   const projectName = originalProjectTitle || 'Epic';
@@ -5227,9 +5911,22 @@ export async function runStage5Mandatory(
   // Small delay between heavy operations
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  const userStoriesResult = await runStage5BUserStories(refinement, classification);
+  // Layer 2: Build story feedback if available
+  const storyFeedbackStr = iterationFeedback
+    ? formatStoryFeedback(iterationFeedback.stage5Feedback, iterationFeedback.positiveAnchors)
+    : undefined;
 
-  // Assemble epic with embedded content
+  const userStoriesResult = await runStage5BUserStories(
+    refinement,
+    classification,
+    comprehension.extractedRequirements || [],
+    storyFeedbackStr
+  );
+
+  // Post-Stage 5B: Deterministic story point validation & auto-correction
+  const storyPointCorrections = validateAndCorrectStoryPoints(userStoriesResult.stories);
+
+  // Assemble epic with embedded content (uses corrected story points)
   const assembledEpic = assembleEpicWithEmbedding(
     refinement,
     architecture.diagram,
@@ -5241,8 +5938,700 @@ export async function runStage5Mandatory(
     architectureDiagram: architecture.diagram,
     diagramType: architecture.type,
     userStories: userStoriesResult.stories,
-    assembledEpic
+    assembledEpic,
+    storyPointCorrections: storyPointCorrections.length > 0 ? storyPointCorrections : undefined
   };
+}
+
+// ===========================================
+// STAGE 6: VALIDATION GATE
+// ===========================================
+
+/**
+ * Extract key terms from text for matching/scoring.
+ * Filters stop words and short words, returns lowercase tokens.
+ */
+export function extractKeyTerms(text: string): string[] {
+  const stopWords = new Set([
+    'that', 'this', 'with', 'from', 'into', 'will', 'must', 'should',
+    'have', 'been', 'being', 'each', 'which', 'their', 'they', 'than',
+    'other', 'between', 'through', 'after', 'before', 'when', 'where', 'support'
+  ]);
+  return text.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/)
+    .filter(w => w.length > 3 && !stopWords.has(w));
+}
+
+/**
+ * Deterministic failure pattern detection (no AI call).
+ * Checks the 8 failure patterns from THE REFINEMENT PROCESS spec.
+ */
+function detectFailurePatterns(
+  epic: string,
+  requirements: ExtractedRequirement[],
+  stories: PipelineUserStory[],
+  _diagram: string,
+  sourceEpic?: string
+): DetectedFailure[] {
+  const failures: DetectedFailure[] = [];
+
+  // Pattern 1: Scope Smoothing — requirements absent from output
+  let smoothedCount = 0;
+  for (const req of requirements) {
+    const keyTerms = extractKeyTerms(req.description);
+    const epicLower = epic.toLowerCase();
+    // Check if at least 30% of key terms appear in the output
+    const matchCount = keyTerms.filter(t => epicLower.includes(t)).length;
+    const matchRatio = keyTerms.length > 0 ? matchCount / keyTerms.length : 1;
+    if (matchRatio < 0.3) {
+      smoothedCount++;
+    }
+  }
+  // Only hard-fail if >20% of requirements are completely smoothed out
+  if (smoothedCount > 0 && requirements.length > 0) {
+    const smoothedRatio = smoothedCount / requirements.length;
+    failures.push({
+      pattern: 'scope_smoothing',
+      location: 'Requirements→Output',
+      evidence: `${smoothedCount}/${requirements.length} requirements have <30% key term coverage in output`,
+      severity: smoothedRatio > 0.2 ? 'hard_fail' : 'scored'
+    });
+  }
+
+  // Pattern 2: Confident Exclusion — "out of scope"/"non-goal" not in source
+  const exclusionMatches = epic.match(/(?:out of scope|non-goal|not included|excluded from|will not be|is not in scope)/gi) || [];
+  if (exclusionMatches.length > 0) {
+    failures.push({
+      pattern: 'confident_exclusion',
+      location: 'Document-wide',
+      evidence: `Found ${exclusionMatches.length} scope exclusion phrases — verify each traces to source`,
+      severity: 'scored'
+    });
+  }
+
+  // Pattern 5: Repetition Bloat — sections exceeding 300 words
+  const sections = epic.split(/\n##\s+/);
+  for (const section of sections) {
+    const firstLine = section.split('\n')[0].trim();
+    const wordCount = section.split(/\s+/).filter(Boolean).length;
+    if (wordCount > 350 && firstLine) {
+      failures.push({
+        pattern: 'repetition_bloat',
+        location: `Section: ${firstLine.substring(0, 50)}`,
+        evidence: `${wordCount} words (exceeds 300-word ceiling)`,
+        severity: 'scored'
+      });
+    }
+  }
+
+  // Pattern 6: Template Contamination — filler phrases
+  const fillerPatterns = [
+    /This (?:ensures?|approach|setup|will be pivotal|is crucial)/gi,
+    /(?:facilitating|leverages?|streamlined|robust)\b/gi,
+  ];
+  let fillerCount = 0;
+  for (const pat of fillerPatterns) {
+    const matches = epic.match(pat) || [];
+    fillerCount += matches.length;
+  }
+  if (fillerCount > 3) {
+    failures.push({
+      pattern: 'template_contamination',
+      location: 'Document-wide',
+      evidence: `${fillerCount} filler/template phrases detected`,
+      severity: 'scored'
+    });
+  }
+
+  // Pattern 7: Partial Story Coverage — stories without reqTags
+  const storiesWithoutTags = stories.filter(s => !s.reqTags || s.reqTags.length === 0);
+  if (storiesWithoutTags.length > 0 && requirements.length > 0) {
+    failures.push({
+      pattern: 'partial_story_coverage',
+      location: 'User Stories',
+      evidence: `${storiesWithoutTags.length}/${stories.length} stories lack [Req #N] tags`,
+      severity: 'scored'
+    });
+  }
+
+  // Pattern 7b: Requirements without any story coverage
+  if (requirements.length > 0 && stories.length > 0) {
+    const coveredReqs = new Set(stories.flatMap(s => s.reqTags || []));
+    const uncoveredReqs = requirements.filter(r => !coveredReqs.has(r.reqNum));
+    // Only hard-fail if >50% of requirements are uncovered; otherwise scored
+    // (story generation covers 5-10 top-priority stories, so 30-50% uncovered is normal for large req sets)
+    const uncoveredRatio = uncoveredReqs.length / requirements.length;
+    if (uncoveredReqs.length > 0) {
+      failures.push({
+        pattern: 'partial_story_coverage',
+        location: 'Requirements→Stories',
+        evidence: `${uncoveredReqs.length}/${requirements.length} requirements lack story coverage: ${uncoveredReqs.map(r => `Req #${r.reqNum}`).join(', ')}`,
+        severity: uncoveredRatio > 0.5 ? 'hard_fail' : 'scored'
+      });
+    }
+  }
+
+  // Pattern 8: Template Artifacts — placeholders and stutters
+  // Exclude "Open Questions" section from placeholder detection (TBD is valid there)
+  const epicWithoutOpenQuestions = epic.replace(/##\s*(?:\d+\.\s*)?Open Questions[\s\S]*?(?=\n##\s|\n---|\n\*Generated on|$)/gi, '');
+  const placeholderMatches = epicWithoutOpenQuestions.match(/\[TODO\]|\[TBD\]|\[Content needed\]|lorem ipsum/gi) || [];
+  if (placeholderMatches.length > 0) {
+    // Compare against source — if source also has [TBD], don't hard-fail (these are user-provided placeholders)
+    const sourcePlaceholderCount = sourceEpic
+      ? (sourceEpic.match(/\[TODO\]|\[TBD\]|\[Content needed\]|lorem ipsum/gi) || []).length
+      : 0;
+    const isFromSource = sourcePlaceholderCount > 0 && placeholderMatches.length <= sourcePlaceholderCount;
+    failures.push({
+      pattern: 'template_artifacts',
+      location: 'Document-wide',
+      evidence: `${placeholderMatches.length} placeholder(s) found: ${placeholderMatches.slice(0, 3).join(', ')}${isFromSource ? ' (from source)' : ''}`,
+      severity: isFromSource ? 'scored' : 'hard_fail'
+    });
+  }
+
+  // Pattern 8b: Template stutter — "I want to I want to", "so that so that"
+  const stutterMatches = epic.match(/I want to I want to|so that so that/gi) || [];
+  if (stutterMatches.length > 0) {
+    failures.push({
+      pattern: 'template_artifacts',
+      location: 'User Stories',
+      evidence: `Template stutter detected: "${stutterMatches[0]}"`,
+      severity: 'hard_fail'
+    });
+  }
+
+  return failures;
+}
+
+/**
+ * Compute a deterministic 0-100 score for an epic across 5 weighted dimensions.
+ * 100% reproducible — same inputs always produce same score.
+ */
+export function computeDeterministicScore(
+  epic: string,
+  requirements: ExtractedRequirement[],
+  stories: PipelineUserStory[],
+  diagram: string,
+  entities: Array<{ entity: string; description: string }>,
+  expectedSectionCount: number
+): DeterministicScoreBreakdown {
+  const epicLower = epic.toLowerCase();
+
+  // === 1. Requirements dimension (30%) ===
+  const perRequirement = requirements.map(req => {
+    const keyTerms = extractKeyTerms(req.description);
+    const matchCount = keyTerms.filter(t => epicLower.includes(t)).length;
+    const keyTermMatchRatio = keyTerms.length > 0 ? matchCount / keyTerms.length : 1;
+    return { reqNum: req.reqNum, keyTermMatchRatio, covered: keyTermMatchRatio >= 0.3 };
+  });
+  const coveredCount = perRequirement.filter(r => r.covered).length;
+  const reqScore = requirements.length > 0
+    ? Math.round((coveredCount / requirements.length) * 100)
+    : 100;
+
+  // === 2. Content Quality dimension (20%) ===
+  const sections = epic.split(/\n##\s+/).filter(Boolean);
+  // Section word compliance: % of sections within 50-350 word range
+  const sectionWordCounts = sections.map(s => s.split(/\s+/).filter(Boolean).length);
+  const compliantSections = sectionWordCounts.filter(wc => wc >= 30 && wc <= 350).length;
+  const sectionWordCompliance = sections.length > 0 ? compliantSections / sections.length : 1;
+
+  const fillerPatterns = [
+    /This (?:ensures?|approach|setup|will be pivotal|is crucial)/gi,
+    /(?:facilitating|leverages?|streamlined|robust)\b/gi,
+  ];
+  let fillerPhraseCount = 0;
+  for (const pat of fillerPatterns) {
+    fillerPhraseCount += (epic.match(pat) || []).length;
+  }
+
+  // Exclude "Open Questions" section from placeholder count
+  const epicWithoutOQ = epic.replace(/##\s*(?:\d+\.\s*)?Open Questions[\s\S]*?(?=\n##\s|\n---|\n\*Generated on|$)/gi, '');
+  const placeholderCount = (epicWithoutOQ.match(/\[TODO\]|\[TBD\]|\[Content needed\]|lorem ipsum/gi) || []).length;
+  const stutterCount = (epic.match(/I want to I want to|so that so that/gi) || []).length;
+
+  let contentScore = 100;
+  contentScore -= (1 - sectionWordCompliance) * 40;
+  contentScore -= Math.min(fillerPhraseCount * 5, 30);
+  contentScore -= placeholderCount * 15;
+  contentScore -= stutterCount * 20;
+  contentScore = Math.max(0, Math.min(100, Math.round(contentScore)));
+
+  // === 3. Stories dimension (20%) ===
+  const storyCount = stories.length;
+  const requirementCount = requirements.length;
+  const storiesWithReqTags = stories.filter(s => s.reqTags && s.reqTags.length > 0).length;
+  const coveredReqNums = new Set(stories.flatMap(s => s.reqTags || []));
+  const requirementsCoveredByStories = requirements.filter(r => coveredReqNums.has(r.reqNum)).length;
+  const storiesWithAcceptanceCriteria = stories.filter(s => s.acceptanceCriteria && s.acceptanceCriteria.length > 0).length;
+
+  // 4 sub-scores each worth 25:
+  const storySubScores = [
+    requirementCount === 0 ? 25 : (storyCount >= requirementCount ? 25 : Math.round((storyCount / requirementCount) * 25)),
+    storyCount === 0 ? 0 : Math.round((storiesWithReqTags / storyCount) * 25),
+    requirementCount === 0 ? 25 : Math.round((requirementsCoveredByStories / requirementCount) * 25),
+    storyCount === 0 ? 0 : Math.round((storiesWithAcceptanceCriteria / storyCount) * 25),
+  ];
+  const storiesScore = storySubScores.reduce((a, b) => a + b, 0);
+
+  // === 4. Diagrams dimension (15%) ===
+  const mermaidBlock = diagram.trim();
+  // Basic syntax check: has a diagram type keyword and at least one arrow/connection
+  const hasDiagramType = /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|mindmap)/m.test(mermaidBlock);
+  const hasConnections = /-->|-->/m.test(mermaidBlock) || /->>/m.test(mermaidBlock) || /==/m.test(mermaidBlock);
+  const syntaxValid = hasDiagramType && (hasConnections || /gantt|pie|mindmap/i.test(mermaidBlock));
+
+  // Count nodes (text within brackets or quoted)
+  const nodeMatches = mermaidBlock.match(/\[["']?[^\]]+["']?\]|\(["']?[^)]+["']?\)|{["']?[^}]+["']?}/g) || [];
+  const nodeCount = nodeMatches.length;
+
+  // Entity term matching: check how many entity names appear in diagram
+  const diagramLower = mermaidBlock.toLowerCase();
+  const entityTerms = entities.map(e => e.entity.toLowerCase());
+  const totalEntityTerms = entityTerms.length;
+  const nodeLabelsMatchingEntities = entityTerms.filter(e => diagramLower.includes(e)).length;
+
+  let diagramScore = 0;
+  diagramScore += syntaxValid ? 40 : 0;
+  diagramScore += Math.min(nodeCount, 5) >= 5 ? 30 : Math.round((Math.min(nodeCount, 5) / 5) * 30);
+  diagramScore += totalEntityTerms > 0
+    ? Math.round((nodeLabelsMatchingEntities / totalEntityTerms) * 30)
+    : 30; // No entities to match → full marks
+  diagramScore = Math.min(100, diagramScore);
+
+  // === 5. Structure dimension (15%) ===
+  const sectionCount = sections.length;
+  const emptySectionCount = sections.filter(s => {
+    // A section is "empty" if it has fewer than 10 words of actual content (excluding the header)
+    const lines = s.split('\n').slice(1); // skip header line
+    const content = lines.join(' ').trim();
+    return content.split(/\s+/).filter(Boolean).length < 10;
+  }).length;
+  const oversizedSectionCount = sectionWordCounts.filter(wc => wc > 350).length;
+
+  let structureScore = 0;
+  // No empty sections (40 pts)
+  structureScore += sectionCount > 0
+    ? Math.round(((sectionCount - emptySectionCount) / sectionCount) * 40)
+    : 40;
+  // Section count within ±30% of expected (30 pts)
+  if (expectedSectionCount > 0) {
+    const ratio = sectionCount / expectedSectionCount;
+    if (ratio >= 0.7 && ratio <= 1.3) {
+      structureScore += 30;
+    } else {
+      structureScore += Math.max(0, Math.round(30 - Math.abs(1 - ratio) * 30));
+    }
+  } else {
+    structureScore += 30;
+  }
+  // No oversized sections (30 pts)
+  structureScore += sectionCount > 0
+    ? Math.round(((sectionCount - oversizedSectionCount) / sectionCount) * 30)
+    : 30;
+  structureScore = Math.min(100, structureScore);
+
+  // === Overall weighted score ===
+  const overallScore = Math.round(
+    reqScore * 0.30 +
+    contentScore * 0.20 +
+    storiesScore * 0.20 +
+    diagramScore * 0.15 +
+    structureScore * 0.15
+  );
+
+  return {
+    requirements: {
+      score: reqScore, weight: 0.30,
+      detail: `${coveredCount}/${requirements.length} requirements covered (>=30% key term match)`,
+      perRequirement
+    },
+    contentQuality: {
+      score: contentScore, weight: 0.20,
+      detail: `Compliance: ${Math.round(sectionWordCompliance * 100)}%, filler: ${fillerPhraseCount}, placeholders: ${placeholderCount}, stutters: ${stutterCount}`,
+      sectionWordCompliance, fillerPhraseCount, placeholderCount, stutterCount
+    },
+    stories: {
+      score: storiesScore, weight: 0.20,
+      detail: `${storyCount} stories, ${storiesWithReqTags} with reqTags, ${requirementsCoveredByStories}/${requirementCount} reqs covered, ${storiesWithAcceptanceCriteria} with AC`,
+      storyCount, requirementCount, storiesWithReqTags, requirementsCoveredByStories, storiesWithAcceptanceCriteria
+    },
+    diagrams: {
+      score: diagramScore, weight: 0.15,
+      detail: `Valid: ${syntaxValid}, ${nodeCount} nodes, ${nodeLabelsMatchingEntities}/${totalEntityTerms} entity matches`,
+      syntaxValid, nodeCount, nodeLabelsMatchingEntities, totalEntityTerms
+    },
+    structure: {
+      score: structureScore, weight: 0.15,
+      detail: `${emptySectionCount} empty, ${sectionCount}/${expectedSectionCount} sections, ${oversizedSectionCount} oversized`,
+      emptySectionCount, sectionCount, expectedSectionCount, oversizedSectionCount
+    },
+    overallScore
+  };
+}
+
+/**
+ * Stage 6: Validation Gate
+ * Performs traceability check (Step 4) and self-audit (Step 5) from The Refinement Process.
+ * Part A: AI-powered traceability + binary checks (1 API call)
+ * Part B: Deterministic failure pattern detection (no API call)
+ * Part C: Deterministic scoring (no AI call)
+ */
+export async function runStage6Validation(
+  assembledEpic: string,
+  extractedRequirements: ExtractedRequirement[],
+  userStories: PipelineUserStory[],
+  diagram: string,
+  iterationNumber: number,
+  previousFailures?: string[],
+  sourceEpic?: string,
+  entities?: Array<{ entity: string; description: string }>,
+  expectedSectionCount?: number
+): Promise<ValidationOutput> {
+  // Part C: Deterministic scoring (always runs, even without AI)
+  const scoreBreakdown = computeDeterministicScore(
+    assembledEpic,
+    extractedRequirements,
+    userStories,
+    diagram,
+    entities || [],
+    expectedSectionCount || 10
+  );
+
+  // If no requirements were extracted (e.g., Stage 1 extraction failed), skip AI validation
+  if (!currentConfig || extractedRequirements.length === 0) {
+    const detectedFailures = detectFailurePatterns(assembledEpic, extractedRequirements, userStories, diagram, sourceEpic);
+    const hardFailCount = detectedFailures.filter(f => f.severity === 'hard_fail').length;
+    const detScore = scoreBreakdown.overallScore;
+    return {
+      traceabilityTable: [],
+      traceabilityCoverage: 0,
+      missingTraceability: [],
+      auditChecklist: [],
+      auditScore: extractedRequirements.length === 0 ? detScore : 0,
+      auditPassed: false,
+      detectedFailures,
+      hardFailCount,
+      passed: false,
+      failureReasons: extractedRequirements.length === 0
+        ? ['No requirements extracted — cannot validate traceability']
+        : ['AI not configured'],
+      iterationNumber,
+      scoreBreakdown,
+    };
+  }
+
+  // Part A: AI-powered traceability + binary checks
+  const systemPrompt = `You are a quality gate for technical documents. Perform requirements traceability mapping.
+
+REQUIREMENTS TRACEABILITY:
+Build a traceability table mapping every requirement to document sections and user stories.
+For each requirement, answer binary questions:
+- Is the core intent addressed in a document section? (YES/NO)
+- Is there a user story covering this requirement? (YES/NO)
+- Are technical specifics preserved? (YES/NO)
+
+Requirements contract (${extractedRequirements.length} total):
+${extractedRequirements.map(r => `[Req #${r.reqNum}] ${r.description}`).join('\n')}
+
+User stories in document:
+${userStories.map(s => `${s.id}: ${s.title} ${s.reqTags ? `[${s.reqTags.map(n => `Req #${n}`).join(', ')}]` : '[no tags]'}`).join('\n')}
+
+Rules:
+- Every row must have at least one entry in documentSections or userStoryIds (both preferred)
+- If any row is empty in both → it's a gap. Mark as "missing"
+- Total rows must = ${extractedRequirements.length}
+${previousFailures?.length ? `\nPREVIOUS ITERATION FAILURES (fix these specifically):\n${previousFailures.join('\n')}` : ''}
+
+OUTPUT FORMAT (JSON only, no markdown):
+{
+  "traceabilityTable": [
+    { "reqNum": 1, "description": "...", "documentSections": ["..."], "userStoryIds": ["US-001"], "status": "covered|partial|missing" }
+  ],
+  "binaryChecks": [
+    { "reqNum": 1, "intentAddressed": true, "storyCoverage": true, "specificsPreserved": true }
+  ]
+}`;
+
+  const userPrompt = `ASSEMBLED DOCUMENT (first 12000 chars):
+${assembledEpic.substring(0, 12000)}
+
+ARCHITECTURE DIAGRAM:
+${diagram.substring(0, 2000)}
+
+Map requirements to document sections and user stories. Answer binary checks per requirement:`;
+
+  try {
+    const response = await callAI(currentConfig, systemPrompt, userPrompt);
+    const parsed = parseJSONResponse<{
+      traceabilityTable?: TraceabilityRow[];
+      binaryChecks?: Array<{ reqNum: number; intentAddressed: boolean; storyCoverage: boolean; specificsPreserved: boolean }>;
+      // Backward compat: old format fields
+      auditChecklist?: AuditCheckItem[];
+      auditScore?: number;
+      failureReasons?: string[];
+    }>(response, 'Stage 6 Validation');
+
+    // Part B: Deterministic failure detection
+    const detectedFailures = detectFailurePatterns(assembledEpic, extractedRequirements, userStories, diagram, sourceEpic);
+
+    const traceabilityTable = parsed.traceabilityTable || [];
+    const missingTraceability = traceabilityTable
+      .filter(r => r.status === 'missing')
+      .map(r => r.reqNum);
+    const coveredCount = traceabilityTable.filter(r => r.status === 'covered').length;
+    const traceabilityCoverage = traceabilityTable.length > 0
+      ? Math.round((coveredCount / traceabilityTable.length) * 100)
+      : 0;
+
+    const hardFailCount = detectedFailures.filter(f => f.severity === 'hard_fail').length;
+
+    // Use deterministic score as the authoritative score (replaces AI auditScore)
+    const auditScore = scoreBreakdown.overallScore;
+    // Pass criteria: deterministic score >= 85 and no hard fails
+    const auditPassed = auditScore >= 85 && hardFailCount === 0;
+
+    // Convert binary checks to audit checklist for backward compat
+    const auditChecklist: AuditCheckItem[] = (parsed.binaryChecks || []).flatMap(check => [
+      { category: 'requirements' as const, rule: `Req #${check.reqNum} intent addressed`, passed: check.intentAddressed, detail: check.intentAddressed ? 'Core intent found in document' : 'Core intent NOT found' },
+      { category: 'stories' as const, rule: `Req #${check.reqNum} story coverage`, passed: check.storyCoverage, detail: check.storyCoverage ? 'Covered by user story' : 'No story coverage' },
+      { category: 'requirements' as const, rule: `Req #${check.reqNum} specifics preserved`, passed: check.specificsPreserved, detail: check.specificsPreserved ? 'Technical specifics intact' : 'Specifics may be lost' },
+    ]);
+    // Fall back to old auditChecklist if binary checks not present
+    const finalChecklist = auditChecklist.length > 0 ? auditChecklist : (parsed.auditChecklist || []);
+
+    const allFailureReasons = [
+      ...(parsed.failureReasons || []),
+      ...detectedFailures.filter(f => f.severity === 'hard_fail').map(f => `${f.pattern}: ${f.evidence}`),
+      ...(missingTraceability.length > 0 ? [`Traceability gaps: Req #${missingTraceability.join(', #')}`] : []),
+    ];
+
+    console.log(`[Stage 6] Iteration ${iterationNumber}: deterministicScore=${auditScore}, hardFails=${hardFailCount}, traceability=${traceabilityCoverage}%, passed=${auditPassed}`);
+
+    return {
+      traceabilityTable,
+      traceabilityCoverage,
+      missingTraceability,
+      auditChecklist: finalChecklist,
+      auditScore,
+      auditPassed,
+      detectedFailures,
+      hardFailCount,
+      passed: auditPassed,
+      failureReasons: allFailureReasons,
+      iterationNumber,
+      scoreBreakdown,
+    };
+  } catch (error) {
+    console.error('[Stage 6] Validation failed:', error);
+    const detectedFailures = detectFailurePatterns(assembledEpic, extractedRequirements, userStories, diagram, sourceEpic);
+    const hardFailCount = detectedFailures.filter(f => f.severity === 'hard_fail').length;
+    // Even on AI failure, return deterministic score
+    const auditScore = scoreBreakdown.overallScore;
+    return {
+      traceabilityTable: [],
+      traceabilityCoverage: 0,
+      missingTraceability: [],
+      auditChecklist: [],
+      auditScore,
+      auditPassed: false,
+      detectedFailures,
+      hardFailCount,
+      passed: auditScore >= 85 && hardFailCount === 0,
+      failureReasons: ['Validation AI call failed: ' + (error instanceof Error ? error.message : String(error))],
+      iterationNumber,
+      scoreBreakdown,
+    };
+  }
+}
+
+// ===========================================
+// LAYER 2: TARGETED FEEDBACK FUNCTIONS
+// ===========================================
+
+/**
+ * Format section-specific feedback for Stage 4 retry prompts.
+ * Returns empty string if no feedback matches this section.
+ */
+export function formatSectionFeedback(
+  sectionTitle: string,
+  feedback: SectionFeedbackItem[],
+  globalAnchors: string[]
+): string {
+  const matching = feedback.filter(f =>
+    f.sectionTitle === '*' ||
+    f.sectionTitle.toLowerCase() === sectionTitle.toLowerCase()
+  );
+  if (matching.length === 0) return '';
+
+  let result = '\n\nFEEDBACK FROM PREVIOUS ITERATION:\n';
+  for (const item of matching) {
+    for (const issue of item.issues) {
+      result += `- Issue: ${issue}\n`;
+    }
+    for (const action of item.actions) {
+      result += `- Action: ${action}\n`;
+    }
+    for (const anchor of item.anchors) {
+      result += `- Keep: ${anchor}\n`;
+    }
+  }
+  if (globalAnchors.length > 0) {
+    result += `- Preserve these strengths: ${globalAnchors.slice(0, 3).join('; ')}\n`;
+  }
+  return result;
+}
+
+/**
+ * Format story-specific feedback for Stage 5 retry prompts.
+ * Returns empty string if no feedback.
+ */
+export function formatStoryFeedback(
+  feedback: StoryFeedbackItem[],
+  globalAnchors: string[]
+): string {
+  if (feedback.length === 0) return '';
+
+  let result = '\n\nFEEDBACK FROM PREVIOUS ITERATION:\n';
+  for (const item of feedback) {
+    result += `- Issue: ${item.issue}\n`;
+    result += `- Action: ${item.action}\n`;
+    if (item.missingReqNums && item.missingReqNums.length > 0) {
+      result += `- Missing coverage for: ${item.missingReqNums.map(n => `Req #${n}`).join(', ')}\n`;
+    }
+  }
+  if (globalAnchors.length > 0) {
+    result += `- Preserve these strengths: ${globalAnchors.slice(0, 3).join('; ')}\n`;
+  }
+  return result;
+}
+
+/**
+ * Build structured feedback from validation results to guide Stage 4/5 retries.
+ * Routes each detected failure to the correct stage with actionable instructions.
+ */
+export function buildIterationFeedback(
+  validation: ValidationOutput,
+  requirements: ExtractedRequirement[],
+  stories: PipelineUserStory[],
+  refinedSections: PipelineRefinedSection[],
+  iteration: number,
+  storyPointCorrections?: StoryPointCorrection[]
+): IterationFeedback {
+  const stage4Feedback: SectionFeedbackItem[] = [];
+  const stage5Feedback: StoryFeedbackItem[] = [];
+  const positiveAnchors: string[] = [];
+
+  // Story point correction feedback — tell Stage 5B to fix at source
+  if (storyPointCorrections && storyPointCorrections.length > 0) {
+    const details = storyPointCorrections.map(c =>
+      `${c.storyId}: ${c.original}→${c.corrected} (${c.reason})`
+    ).join(', ');
+    stage5Feedback.push({
+      issue: `${storyPointCorrections.length} stories had invalid story points (auto-corrected): ${details}`,
+      action: 'USE ONLY Fibonacci values {1, 2, 3, 5} for story points. Max 5 per story. Total must not exceed 30.',
+      sourcePattern: 'story_point_violation'
+    });
+  }
+
+  for (const failure of validation.detectedFailures) {
+    switch (failure.pattern) {
+      case 'scope_smoothing': {
+        // Identify which requirements are missing from which sections
+        const epicLower = refinedSections.map(s => s.refinedContent.toLowerCase()).join(' ');
+        const missingReqs = requirements.filter(req => {
+          const terms = extractKeyTerms(req.description);
+          const matchCount = terms.filter(t => epicLower.includes(t)).length;
+          return terms.length > 0 && matchCount / terms.length < 0.3;
+        });
+        if (missingReqs.length > 0) {
+          stage4Feedback.push({
+            sectionTitle: '*',
+            issues: [`${missingReqs.length} requirements have insufficient coverage`],
+            actions: missingReqs.map(r => `Ensure Req #${r.reqNum} ("${r.description.substring(0, 60)}") is addressed with specific content`),
+            anchors: [],
+            sourcePattern: 'scope_smoothing'
+          });
+        }
+        break;
+      }
+
+      case 'repetition_bloat': {
+        const sectionName = failure.location.replace('Section: ', '');
+        stage4Feedback.push({
+          sectionTitle: sectionName,
+          issues: [failure.evidence],
+          actions: ['Reduce to under 300 words by removing redundant content'],
+          anchors: [],
+          sourcePattern: 'repetition_bloat'
+        });
+        break;
+      }
+
+      case 'template_contamination': {
+        stage4Feedback.push({
+          sectionTitle: '*',
+          issues: [failure.evidence],
+          actions: ['Remove filler phrases: "This ensures...", "This approach...", "facilitating", "leverages", "streamlined", "robust"'],
+          anchors: [],
+          sourcePattern: 'template_contamination'
+        });
+        break;
+      }
+
+      case 'template_artifacts': {
+        stage4Feedback.push({
+          sectionTitle: '*',
+          issues: [failure.evidence],
+          actions: ['Replace all [TBD]/[TODO] with concrete values or remove entirely'],
+          anchors: [],
+          sourcePattern: 'template_artifacts'
+        });
+        break;
+      }
+
+      case 'confident_exclusion': {
+        stage4Feedback.push({
+          sectionTitle: '*',
+          issues: [failure.evidence],
+          actions: ['Verify each scope exclusion traces to the source document. Remove invented exclusions.'],
+          anchors: [],
+          sourcePattern: 'confident_exclusion'
+        });
+        break;
+      }
+
+      case 'partial_story_coverage': {
+        // Extract missing requirement numbers from evidence
+        const reqNumMatches = failure.evidence.match(/Req #(\d+)/g) || [];
+        const missingReqNums = reqNumMatches.map(m => parseInt(m.replace('Req #', '')));
+        stage5Feedback.push({
+          issue: failure.evidence,
+          action: missingReqNums.length > 0
+            ? `Create stories covering requirements: ${missingReqNums.map(n => `Req #${n}`).join(', ')}`
+            : 'Ensure all stories have [Req #N] tags linking to requirements',
+          missingReqNums: missingReqNums.length > 0 ? missingReqNums : undefined,
+          sourcePattern: 'partial_story_coverage'
+        });
+        break;
+      }
+    }
+  }
+
+  // Build positive anchors from covered requirements and tagged stories
+  const coveredRows = validation.traceabilityTable.filter(r => r.status === 'covered');
+  if (coveredRows.length > 0) {
+    positiveAnchors.push(`${coveredRows.length}/${validation.traceabilityTable.length} requirements fully traced`);
+  }
+  const taggedStories = stories.filter(s => s.reqTags && s.reqTags.length > 0);
+  if (taggedStories.length > 0) {
+    positiveAnchors.push(`${taggedStories.length}/${stories.length} stories properly tagged`);
+  }
+  const keptSections = refinedSections.filter(s => s.wasKept);
+  if (keptSections.length > 0) {
+    positiveAnchors.push(`${keptSections.length} sections kept as-is (high quality)`);
+  }
+
+  return { stage4Feedback, stage5Feedback, positiveAnchors, iteration };
 }
 
 // ===========================================
@@ -5262,73 +6651,276 @@ export type PipelineProgressCallback = (
  * Run the complete Premium 5-Stage Pipeline
  * This is the main entry point that orchestrates all stages
  */
+/** Retry an async function with exponential backoff */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  maxRetries: number = 3,
+  baseDelayMs: number = 2000
+): Promise<T> {
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isRetryable = lastError.message.includes('empty response')
+        || lastError.message.includes('Failed to parse')
+        || lastError.message.includes('Rate limit')
+        || lastError.message.includes('transient')
+        || lastError.message.includes('fetch failed')
+        || lastError.message.includes('network')
+        || lastError.message.includes('ECONNRESET')
+        || lastError.message.includes('timeout');
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
+
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      console.warn(`[${label}] Attempt ${attempt}/${maxRetries} failed: ${lastError.message}. Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError!;
+}
+
+// Layer 3: Smart retry constants and helpers
+const MAX_ITERATIONS = 3;
+const SCORE_PASS = 85;
+const SCORE_TARGETED_HIGH = 75;
+const CONVERGENCE_THRESHOLD = 3;
+
+function getIterationScore(v: ValidationOutput): number {
+  return v.scoreBreakdown?.overallScore ?? v.auditScore;
+}
+
+function getMaxRetriesForScore(score: number, hardFailCount: number): number {
+  if (hardFailCount > 0) return Math.max(1, score < 60 ? 2 : 1);
+  if (score >= SCORE_PASS) return 0;
+  if (score >= SCORE_TARGETED_HIGH) return 1;
+  return 2;
+}
+
 export async function runPremiumPipeline(
   epicContent: string,
   onProgress?: PipelineProgressCallback
 ): Promise<PipelineResult> {
   const startTime = Date.now();
-  const stagesCompleted: (1 | 2 | 3 | 4 | 5)[] = [];
+  const stagesCompleted: PipelineStage[] = [];
 
   // Extract original project title from epic content BEFORE any processing
   const originalProjectTitle = extractProjectTitle(epicContent);
 
   try {
-    // Stage 1: Deep Comprehension
+    // ===== STAGES 1-3: Run once (stable output) =====
+
+    // Stage 1: Deep Comprehension + Requirement Extraction
     onProgress?.(1, 'running', 'Building mental model of the epic...');
-    const comprehension = await runStage1Comprehension(epicContent);
+    const comprehension = await withRetry(
+      () => runStage1Comprehension(epicContent),
+      'Stage 1 Comprehension'
+    );
     stagesCompleted.push(1);
-    onProgress?.(1, 'complete', `Identified ${comprehension.keyEntities.length} entities, ${comprehension.detectedGaps.length} gaps`);
+    const reqCount = comprehension.extractedRequirements?.length ?? 0;
+    onProgress?.(1, 'complete', `Identified ${comprehension.keyEntities.length} entities, ${reqCount} requirements extracted`);
 
     // Stage 2: Category Classification
     onProgress?.(2, 'running', 'Classifying document type...');
-    const classification = await runStage2Classification(epicContent, comprehension);
+    const classification = await withRetry(
+      () => runStage2Classification(epicContent, comprehension),
+      'Stage 2 Classification'
+    );
     stagesCompleted.push(2);
     onProgress?.(2, 'complete', `Classified as ${classification.primaryCategory.replace(/_/g, ' ')} (${Math.round(classification.confidence * 100)}% confidence)`);
 
     // Stage 3: Structural Assessment
     onProgress?.(3, 'running', 'Assessing document structure...');
-    const structural = await runStage3Structural(epicContent, comprehension, classification);
+    const structural = await withRetry(
+      () => runStage3Structural(epicContent, comprehension, classification),
+      'Stage 3 Structural'
+    );
     stagesCompleted.push(3);
     onProgress?.(3, 'complete', `${structural.transformationPlan.length} transformations planned, ${structural.missingSections.length} missing sections`);
 
-    // Stage 4: Content Refinement (with progress updates)
-    // Pass originalProjectTitle so AI uses correct project name in prompts
-    onProgress?.(4, 'running', 'Refining content...');
-    const refinement = await runStage4Refinement(
-      epicContent,
-      comprehension,
-      classification,
-      structural,
-      originalProjectTitle,
-      (current, total, section) => {
-        onProgress?.(4, 'running', `Refining section ${current}/${total}: ${section}`);
-      }
-    );
-    stagesCompleted.push(4);
-    onProgress?.(4, 'complete', `${refinement.refinedSections.length} sections refined`);
+    // Compute expected section count for deterministic scoring
+    const template = loadCategoryTemplate(classification.primaryCategory);
+    const expectedSectionCount = Object.keys(template.requiredSections).length +
+      Math.min(Object.keys(template.optionalSections).length, 3);
 
-    // Stage 5: Mandatory Sections
-    onProgress?.(5, 'running', 'Generating architecture diagram and user stories...');
-    const mandatory = await runStage5Mandatory(refinement, comprehension, classification, originalProjectTitle);
-    stagesCompleted.push(5);
-    onProgress?.(5, 'complete', `Generated diagram + ${mandatory.userStories.length} user stories`);
+    // ===== STAGES 4→5→6: Iterative refinement loop with smart retry =====
+    let refinement: RefinementOutput | undefined;
+    let mandatory: MandatoryOutput | undefined;
+    let validation: ValidationOutput | undefined;
+    let previousFailures: string[] = [];
+    let iterationsRun = 0;
+    let iterationFeedback: IterationFeedback | undefined;
+
+    // Layer 3: Best-of-N tracking
+    interface IterationSnapshot {
+      refinement: RefinementOutput;
+      mandatory: MandatoryOutput;
+      validation: ValidationOutput;
+      score: number;
+      iteration: number;
+    }
+    let bestResult: IterationSnapshot | null = null;
+    const allIterationScores: number[] = [];
+    let previousScore: number | null = null;
+
+    for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
+      iterationsRun = iteration;
+
+      // Layer 3: Tiered gate — check if this iteration is allowed
+      if (iteration > 1 && bestResult) {
+        const maxRetries = getMaxRetriesForScore(bestResult.score, bestResult.validation.hardFailCount);
+        if (iteration - 1 > maxRetries) {
+          console.log(`[Pipeline] Tiered gate: score=${bestResult.score}, maxRetries=${maxRetries}, stopping at iteration ${iteration}`);
+          break;
+        }
+      }
+
+      // Stage 4: Content Refinement
+      const iterLabel = iteration > 1 ? ` (iteration ${iteration})` : '';
+      onProgress?.(4, 'running', `Refining content${iterLabel}...`);
+
+      // Pass original epicContent always — do NOT append failure context to epicContent
+      // (appending confuses Stage 4 section parsing and causes iteration degradation)
+      // Layer 2: Pass iterationFeedback (undefined on iteration 1)
+      refinement = await withRetry(
+        () => runStage4Refinement(
+          epicContent,
+          comprehension,
+          classification,
+          structural,
+          originalProjectTitle,
+          (current, total, section) => {
+            onProgress?.(4, 'running', `Refining section ${current}/${total}: ${section}${iterLabel}`);
+          },
+          iterationFeedback
+        ),
+        'Stage 4 Refinement'
+      );
+
+      if (!stagesCompleted.includes(4)) stagesCompleted.push(4);
+      onProgress?.(4, 'complete', `${refinement.refinedSections.length} sections refined${iterLabel}`);
+
+      // Stage 5: Mandatory Sections (Architecture + User Stories)
+      onProgress?.(5, 'running', `Generating architecture diagram and user stories${iterLabel}...`);
+      // Layer 2: Pass iterationFeedback to Stage 5
+      mandatory = await withRetry(
+        () => runStage5Mandatory(refinement!, comprehension, classification, originalProjectTitle, iterationFeedback),
+        'Stage 5 Mandatory'
+      );
+
+      if (!stagesCompleted.includes(5)) stagesCompleted.push(5);
+      onProgress?.(5, 'complete', `Generated diagram + ${mandatory.userStories.length} user stories${iterLabel}`);
+
+      // Stage 6: Validation Gate
+      onProgress?.(6, 'running', `Running validation gate${iterLabel}...`);
+
+      try {
+        validation = await runStage6Validation(
+          mandatory.assembledEpic.markdown,
+          comprehension.extractedRequirements || [],
+          mandatory.userStories,
+          mandatory.architectureDiagram,
+          iteration,
+          previousFailures.length > 0 ? previousFailures : undefined,
+          epicContent, // Pass source epic for [TBD] comparison in failure detection
+          comprehension.keyEntities, // Pass entities for diagram scoring
+          expectedSectionCount
+        );
+
+        if (!stagesCompleted.includes(6)) stagesCompleted.push(6);
+
+        const currentScore = getIterationScore(validation);
+        allIterationScores.push(currentScore);
+
+        // Layer 3: Update best result if improved
+        if (!bestResult || currentScore > bestResult.score) {
+          bestResult = {
+            refinement: refinement!,
+            mandatory: mandatory!,
+            validation,
+            score: currentScore,
+            iteration
+          };
+        }
+
+        if (validation.passed) {
+          onProgress?.(6, 'complete', `Validation PASSED (score: ${currentScore}, iteration ${iteration})`);
+          break; // Success — exit loop
+        }
+
+        // Layer 3: Convergence check — if improvement < CONVERGENCE_THRESHOLD and no hard fails fixed, stop
+        if (previousScore !== null) {
+          const improvement = currentScore - previousScore;
+          if (improvement < CONVERGENCE_THRESHOLD && validation.hardFailCount === 0) {
+            console.log(`[Pipeline] Convergence: improvement=${improvement} < ${CONVERGENCE_THRESHOLD}, stopping`);
+            onProgress?.(6, 'complete', `Validation converged (score: ${currentScore}, improvement: +${improvement}, ${iteration} iterations)`);
+            break;
+          }
+        }
+
+        previousScore = currentScore;
+
+        // Validation failed — collect failures for next iteration
+        previousFailures = validation.failureReasons.slice(0, 10);
+        const hardFails = validation.hardFailCount;
+
+        // Layer 2: Build structured feedback for next iteration
+        iterationFeedback = buildIterationFeedback(
+          validation,
+          comprehension.extractedRequirements || [],
+          mandatory.userStories,
+          refinement.refinedSections,
+          iteration,
+          mandatory.storyPointCorrections
+        );
+
+        if (iteration < MAX_ITERATIONS) {
+          onProgress?.(6, 'running', `Validation failed (score: ${currentScore}, ${hardFails} hard fails) — retrying with feedback (${iteration}/${MAX_ITERATIONS})...`);
+        } else {
+          onProgress?.(6, 'complete', `Validation completed (score: ${currentScore}, ${hardFails} hard fails, ${iteration} iterations — best effort)`);
+        }
+      } catch (validationError) {
+        // Validation errors should not break the pipeline — log and continue with best effort
+        console.warn('Stage 6 validation error:', validationError);
+        if (!stagesCompleted.includes(6)) stagesCompleted.push(6);
+        onProgress?.(6, 'complete', `Validation skipped due to error${iterLabel}`);
+        break; // Don't retry if validation itself is broken
+      }
+    }
 
     const totalDuration = Date.now() - startTime;
+
+    // Layer 3: Best-result return — use best iteration if latest regressed
+    const useBest = bestResult && validation
+      && getIterationScore(validation) < bestResult.score;
+    const finalRefinement = useBest ? bestResult!.refinement : refinement!;
+    const finalMandatory = useBest ? bestResult!.mandatory : mandatory!;
+    const finalValidation = useBest ? bestResult!.validation : validation;
+    const bestIterationUsed = useBest ? bestResult!.iteration : iterationsRun;
 
     return {
       comprehension,
       classification,
       structural,
-      refinement,
-      mandatory,
+      refinement: finalRefinement,
+      mandatory: finalMandatory,
       totalDuration,
-      stagesCompleted
+      stagesCompleted,
+      validation: finalValidation,
+      iterationsRun,
+      bestIterationUsed,
+      allIterationScores
     };
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const failedStage = stagesCompleted.length + 1;
-    onProgress?.(failedStage as 1 | 2 | 3 | 4 | 5, 'error', errorMessage);
+    onProgress?.(failedStage as PipelineStage, 'error', errorMessage);
     throw new Error(`Pipeline failed at stage ${failedStage}: ${errorMessage}`);
   }
 }

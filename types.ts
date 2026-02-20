@@ -189,6 +189,29 @@ export interface ComprehensionOutput {
   implicitRisks: string[];          // Author didn't call out
   semanticSections: SemanticSection[];
   timestamp: number;
+  // Refinement Process Step 1: Requirement Extraction
+  extractedRequirements?: ExtractedRequirement[];
+  requirementCount?: number;        // The "contract" count
+  // Refinement Process Step 2: Gap Analysis
+  gapAnalysis?: RequirementGap[];
+  validOpenQuestions?: string[];     // Genuine unknowns source doesn't answer
+}
+
+/** A single extracted requirement from the source epic */
+export interface ExtractedRequirement {
+  reqNum: number;           // Sequential: 1, 2, 3...
+  description: string;      // What the requirement says
+  sourceSection: string;    // Which section it came from
+  sourceText: string;       // Original text for traceability (max 200 chars)
+  category: 'functional' | 'non-functional' | 'infrastructure' | 'operational';
+}
+
+/** Gap analysis for a single requirement */
+export interface RequirementGap {
+  reqNum: number;
+  hasEnoughDetail: boolean;
+  openQuestions: string[];       // Legitimate unknowns source doesn't answer
+  detailLevel: 'complete' | 'partial' | 'minimal';
 }
 
 // Stage 2: Category Classification Output
@@ -305,7 +328,9 @@ export interface PipelineUserStory {
   benefit: string;
   acceptanceCriteria: string[];
   priority: 'high' | 'medium' | 'low';
+  storyPoints?: number;        // Fibonacci: 1, 2, 3, or 5 (1 point = 1 dev-day)
   sourceSection: string;       // Section title this story derives from
+  reqTags?: number[];          // [Req #N] requirement tags this story covers
 }
 
 export interface CoverageReport {
@@ -325,15 +350,23 @@ export interface AssembledEpic {
   wordCount: number;           // Total word count
 }
 
+export interface StoryPointCorrection {
+  storyId: string;
+  original: number;
+  corrected: number;
+  reason: 'invalid_fibonacci' | 'exceeds_per_story_cap' | 'total_cap_reduction';
+}
+
 export interface MandatoryOutput {
   architectureDiagram: string;   // Mermaid diagram code
   diagramType: string;           // flowchart, sequence, etc.
   userStories: PipelineUserStory[];
   assembledEpic: AssembledEpic;  // Final epic with embedded content
+  storyPointCorrections?: StoryPointCorrection[];
 }
 
 // Pipeline State Types
-export type PipelineStage = 1 | 2 | 3 | 4 | 5;
+export type PipelineStage = 1 | 2 | 3 | 4 | 5 | 6;
 export type StageStatus = 'pending' | 'running' | 'complete' | 'error';
 
 export interface StageProgress {
@@ -350,6 +383,7 @@ export interface PipelineProgress {
     3: StageProgress;
     4: StageProgress;
     5: StageProgress;
+    6: StageProgress;
   };
   startTime: number;                 // ms since epoch
   estimatedTimeRemaining: number;    // seconds
@@ -363,6 +397,116 @@ export interface PipelineResult {
   mandatory: MandatoryOutput;
   totalDuration: number;         // ms
   stagesCompleted: PipelineStage[];
+  // Refinement Process: Validation results
+  validation?: ValidationOutput;
+  iterationsRun?: number;
+  bestIterationUsed?: number;
+  allIterationScores?: number[];
+}
+
+// ===========================================
+// STAGE 6: VALIDATION GATE TYPES
+// ===========================================
+
+/** A single row in the requirements traceability table */
+export interface TraceabilityRow {
+  reqNum: number;
+  description: string;
+  documentSections: string[];    // Which output sections address this requirement
+  userStoryIds: string[];        // Which US-XXX stories cover this requirement
+  status: 'covered' | 'partial' | 'missing';
+}
+
+/** Self-audit checklist item */
+export interface AuditCheckItem {
+  category: 'requirements' | 'scope' | 'diagrams' | 'structure' | 'stories' | 'formatting';
+  rule: string;
+  passed: boolean;
+  detail: string;      // Why it passed or failed
+}
+
+/** Detected failure from the 8 failure patterns */
+export interface DetectedFailure {
+  pattern: string;        // scope_smoothing, confident_exclusion, decision_override, etc.
+  location: string;       // Section or story where detected
+  evidence: string;       // What triggered the detection
+  severity: 'hard_fail' | 'scored';
+}
+
+/** Stage 6: Validation output */
+export interface ValidationOutput {
+  // Step 4: Requirements Traceability
+  traceabilityTable: TraceabilityRow[];
+  traceabilityCoverage: number;      // percentage 0-100
+  missingTraceability: number[];     // Req #s not fully traced
+  // Step 5: Self-Audit
+  auditChecklist: AuditCheckItem[];
+  auditScore: number;                // 0-100, min 85 to pass
+  auditPassed: boolean;
+  // Failure Pattern Detection
+  detectedFailures: DetectedFailure[];
+  hardFailCount: number;
+  // Overall gate
+  passed: boolean;
+  failureReasons: string[];
+  iterationNumber: number;
+  // Deterministic scoring breakdown
+  scoreBreakdown?: DeterministicScoreBreakdown;
+}
+
+/** Deterministic scoring breakdown — 5 weighted dimensions, 100% reproducible */
+export interface DeterministicScoreBreakdown {
+  requirements: {
+    score: number; weight: 0.30; detail: string;
+    perRequirement: Array<{ reqNum: number; keyTermMatchRatio: number; covered: boolean }>;
+  };
+  contentQuality: {
+    score: number; weight: 0.20; detail: string;
+    sectionWordCompliance: number; fillerPhraseCount: number;
+    placeholderCount: number; stutterCount: number;
+  };
+  stories: {
+    score: number; weight: 0.20; detail: string;
+    storyCount: number; requirementCount: number;
+    storiesWithReqTags: number; requirementsCoveredByStories: number;
+    storiesWithAcceptanceCriteria: number;
+  };
+  diagrams: {
+    score: number; weight: 0.15; detail: string;
+    syntaxValid: boolean; nodeCount: number;
+    nodeLabelsMatchingEntities: number; totalEntityTerms: number;
+  };
+  structure: {
+    score: number; weight: 0.15; detail: string;
+    emptySectionCount: number; sectionCount: number;
+    expectedSectionCount: number; oversizedSectionCount: number;
+  };
+  overallScore: number;
+}
+
+/** Feedback item for a specific section (Stage 4 retry) */
+export interface SectionFeedbackItem {
+  sectionTitle: string;
+  issues: string[];
+  actions: string[];
+  anchors: string[];
+  sourcePattern: string;
+}
+
+/** Feedback item for user stories (Stage 5 retry) */
+export interface StoryFeedbackItem {
+  issue: string;
+  action: string;
+  missingReqNums?: number[];
+  sourcePattern: string;
+}
+
+/** Structured feedback from validation to guide Stage 4/5 retries */
+export interface IterationFeedback {
+  stage4Feedback: SectionFeedbackItem[];
+  stage5Feedback: StoryFeedbackItem[];
+  positiveAnchors: string[];
+  iteration: number;
 }
 
 export interface PipelineState {
